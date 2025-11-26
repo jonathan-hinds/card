@@ -1,0 +1,21 @@
+{
+  "name": "render-node-hello",
+  "version": "1.0.0",
+  "description": "Simple Node.js hello world web game starter for Render.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "render",
+    "node",
+    "express",
+    "hello-world"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

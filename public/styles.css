@@ -284,11 +284,13 @@ h1 {
 
 .deck-builder {
   gap: 18px;
+  min-height: 80vh;
 }
 
 .deck-layout {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-areas: 'browser deck';
   gap: 14px;
 }
 
@@ -300,6 +302,15 @@ h1 {
   display: grid;
   gap: 12px;
   min-height: 540px;
+  overflow: auto;
+}
+
+.deck-panel {
+  grid-area: deck;
+}
+
+.card-browser {
+  grid-area: browser;
 }
 
 .browser-head {
@@ -318,16 +329,16 @@ h1 {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
 }
 
 .card-tile {
   border: 2px solid var(--fg);
   background: #0a0a0a;
-  padding: 12px;
+  padding: 10px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   transition: border-color 120ms ease, transform 120ms ease;
 }
@@ -349,6 +360,7 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .badge {
@@ -366,6 +378,7 @@ h1 {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+  min-height: 36px;
 }
 
 .tags {
@@ -374,6 +387,17 @@ h1 {
   gap: 6px;
   color: var(--muted);
   font-size: 11px;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cta.tiny {
+  padding: 10px 12px;
+  font-size: 10px;
+  letter-spacing: 0.5px;
 }
 
 .pill {
@@ -439,10 +463,13 @@ code {
 @media (max-width: 960px) {
   .deck-layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'deck'
+      'browser';
   }
 
   .card-grid {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
@@ -469,4 +496,86 @@ code {
   .deck-name {
     width: 100%;
   }
+
+  .deck-builder {
+    gap: 14px;
+  }
+
+  .deck-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 0.9fr) minmax(320px, 1.1fr);
+    height: calc(100vh - 220px);
+  }
+
+  .card-browser,
+  .deck-panel {
+    min-height: auto;
+    max-height: none;
+    border-width: 2px;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .card-tile {
+    padding: 9px;
+  }
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(2px);
+}
+
+.modal-body {
+  position: relative;
+  width: min(500px, 92%);
+  background: #050505;
+  border: 2px solid var(--fg);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 0 0 2px #0a0a0a;
+  z-index: 1;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.modal-text {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
 }

@@ -25,6 +25,14 @@ const deckNameInput = document.getElementById('deck-name');
 const deckCount = document.getElementById('deck-count');
 const clearDeckButton = document.getElementById('clear-deck');
 const saveDeckButton = document.getElementById('save-deck');
+const cardModal = document.getElementById('card-modal');
+const modalBackdrop = document.getElementById('modal-backdrop');
+const closeModalButton = document.getElementById('close-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalMeta = document.getElementById('modal-meta');
+const modalText = document.getElementById('modal-text');
+const modalTags = document.getElementById('modal-tags');
+const modalAddButton = document.getElementById('modal-add');
 
 let activeToken = localStorage.getItem('gothic_token') || '';
 let activeUser = localStorage.getItem('gothic_user') || '';
@@ -113,6 +121,33 @@ function buildTags(card) {
   return Array.from(types);
 }
 
+function hideCardModal() {
+  cardModal.classList.add('hidden');
+}
+
+function showCardModal(card) {
+  modalTitle.textContent = card.name;
+  modalMeta.innerHTML = '';
+  const schoolBadge = document.createElement('span');
+  schoolBadge.className = 'badge';
+  schoolBadge.textContent = `${card.school} • ${card.cardType}`;
+  const costBadge = document.createElement('span');
+  costBadge.className = 'badge';
+  costBadge.textContent = `Cost ${card.cost?.soulfire ?? 0}`;
+  modalMeta.append(schoolBadge, costBadge);
+
+  modalText.textContent = card.rulesText;
+  modalTags.innerHTML = '';
+  buildTags(card).forEach((tag) => {
+    const chip = document.createElement('span');
+    chip.textContent = tag;
+    modalTags.appendChild(chip);
+  });
+
+  modalAddButton.onclick = () => addToDeck(card);
+  cardModal.classList.remove('hidden');
+}
+
 function renderCardGrid(cards) {
   cardGrid.innerHTML = '';
   cards.forEach((card) => {
@@ -146,8 +181,41 @@ function renderCardGrid(cards) {
       tagRow.appendChild(chip);
     });
 
-    tile.append(title, meta, text, tagRow);
-    tile.addEventListener('click', () => addToDeck(card));
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const addButton = document.createElement('button');
+    addButton.className = 'cta tiny';
+    addButton.textContent = 'Add';
+    addButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      addToDeck(card);
+    });
+    addButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+    actions.appendChild(addButton);
+
+    tile.append(title, meta, text, tagRow, actions);
+
+    let holdTimeout;
+    let holdTriggered = false;
+
+    const startHold = () => {
+      clearTimeout(holdTimeout);
+      holdTriggered = false;
+      holdTimeout = setTimeout(() => {
+        holdTriggered = true;
+        showCardModal(card);
+      }, 400);
+    };
+
+    const endHold = () => {
+      clearTimeout(holdTimeout);
+      if (!holdTriggered) addToDeck(card);
+    };
+
+    tile.addEventListener('pointerdown', startHold);
+    tile.addEventListener('pointerup', endHold);
+    tile.addEventListener('pointerleave', () => clearTimeout(holdTimeout));
+    tile.addEventListener('pointercancel', () => clearTimeout(holdTimeout));
     cardGrid.appendChild(tile);
   });
 }
@@ -377,6 +445,12 @@ saveDeckButton.addEventListener('click', saveDeck);
 
 cardSearch.addEventListener('input', applyFilters);
 schoolFilter.addEventListener('change', applyFilters);
+
+closeModalButton.addEventListener('click', hideCardModal);
+modalBackdrop.addEventListener('click', hideCardModal);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') hideCardModal();
+});
 
 tabs.forEach((tab) => {
   tab.addEventListener('click', () => {

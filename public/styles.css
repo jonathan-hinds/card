@@ -327,41 +327,48 @@ h1 {
   align-items: center;
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-}
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+  }
 
-.card-tile {
-  border: 2px solid var(--fg);
-  background: #0a0a0a;
-  padding: 10px;
-  display: grid;
-  gap: 6px;
-  cursor: pointer;
-  transition: border-color 120ms ease, transform 120ms ease;
-}
+  .card-tile {
+    border: 2px solid var(--fg);
+    background: #0a0a0a;
+    padding: 10px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 120ms ease, transform 120ms ease;
+    min-height: 140px;
+  }
 
 .card-tile:hover {
   border-color: #fff;
   transform: translateY(-2px);
 }
 
-.card-title {
-  margin: 0;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 14px;
-  line-height: 1.3;
-}
+  .card-title {
+    margin: 0;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    line-height: 1.3;
+    min-height: 38px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
-.card-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+  .card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-self: end;
+    width: 100%;
+  }
 
 .badge {
   padding: 4px 6px;

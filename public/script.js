@@ -58,7 +58,7 @@ function clearSession() {
 
 function renderProfile(username) {
   profileName.textContent = username;
-  profileMeta.textContent = 'Monochrome session active';
+  profileMeta.textContent = 'Ready for the next duel';
   profileCard.hidden = false;
 }
 
@@ -98,7 +98,7 @@ loginForm.addEventListener('submit', async (event) => {
 
 logoutButton.addEventListener('click', () => {
   clearSession();
-  showStatus('You fade into the background. Token cleared.', 'success');
+  showStatus('Signed out. Session cleared.', 'success');
 });
 
 async function hydrateProfile() {

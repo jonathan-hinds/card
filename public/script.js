@@ -25,8 +25,6 @@ const deckCount = document.getElementById('deck-count');
 const clearDeckButton = document.getElementById('clear-deck');
 const saveDeckButton = document.getElementById('save-deck');
 const schoolChips = document.getElementById('school-chips');
-const deckPanel = document.getElementById('deck-panel');
-const toggleDeckButton = document.getElementById('toggle-deck');
 const cardModal = document.getElementById('card-modal');
 const modalBackdrop = document.getElementById('modal-backdrop');
 const closeModalButton = document.getElementById('close-modal');
@@ -446,11 +444,6 @@ schoolChips.addEventListener('click', (event) => {
   activeSchool = school;
   schoolChips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === button));
   applyFilters();
-});
-
-toggleDeckButton.addEventListener('click', () => {
-  deckPanel.classList.toggle('collapsed');
-  toggleDeckButton.textContent = deckPanel.classList.contains('collapsed') ? 'Show' : 'Hide';
 });
 
 closeModalButton.addEventListener('click', hideCardModal);

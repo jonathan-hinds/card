@@ -307,9 +307,6 @@ h1 {
 
 .deck-panel {
   grid-area: deck;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .card-browser {
@@ -454,10 +451,6 @@ h1 {
   margin: 0;
   display: grid;
   gap: 8px;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .deck-item {

@@ -19,12 +19,14 @@ const backToMenuButton = document.getElementById('back-to-menu');
 
 const cardGrid = document.getElementById('card-grid');
 const cardSearch = document.getElementById('card-search');
-const schoolFilter = document.getElementById('school-filter');
 const deckList = document.getElementById('deck-list');
 const deckNameInput = document.getElementById('deck-name');
 const deckCount = document.getElementById('deck-count');
 const clearDeckButton = document.getElementById('clear-deck');
 const saveDeckButton = document.getElementById('save-deck');
+const schoolChips = document.getElementById('school-chips');
+const deckPanel = document.getElementById('deck-panel');
+const toggleDeckButton = document.getElementById('toggle-deck');
 const cardModal = document.getElementById('card-modal');
 const modalBackdrop = document.getElementById('modal-backdrop');
 const closeModalButton = document.getElementById('close-modal');
@@ -40,6 +42,7 @@ let cardPool = [];
 let deckState = new Map();
 let cardsLoaded = false;
 let decksLoaded = false;
+let activeSchool = '';
 
 function showStatus(message, variant = 'success', target = statusBox) {
   if (!target) return;
@@ -214,9 +217,8 @@ function renderCardGrid(cards) {
 
 function applyFilters() {
   const query = cardSearch.value.toLowerCase();
-  const school = schoolFilter.value;
   const filtered = cardPool.filter((card) => {
-    const matchesSchool = !school || card.school === school;
+    const matchesSchool = !activeSchool || card.school === activeSchool;
     const matchesQuery =
       !query ||
       card.name.toLowerCase().includes(query) ||
@@ -436,7 +438,20 @@ clearDeckButton.addEventListener('click', resetDeck);
 saveDeckButton.addEventListener('click', saveDeck);
 
 cardSearch.addEventListener('input', applyFilters);
-schoolFilter.addEventListener('change', applyFilters);
+
+schoolChips.addEventListener('click', (event) => {
+  const button = event.target.closest('.chip');
+  if (!button) return;
+  const school = button.dataset.school;
+  activeSchool = school;
+  schoolChips.querySelectorAll('.chip').forEach((chip) => chip.classList.toggle('active', chip === button));
+  applyFilters();
+});
+
+toggleDeckButton.addEventListener('click', () => {
+  deckPanel.classList.toggle('collapsed');
+  toggleDeckButton.textContent = deckPanel.classList.contains('collapsed') ? 'Show' : 'Hide';
+});
 
 closeModalButton.addEventListener('click', hideCardModal);
 modalBackdrop.addEventListener('click', hideCardModal);

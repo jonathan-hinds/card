@@ -1,0 +1,462 @@
+Perfect, this is exactly the point where it helps to see real cards.
+
+Below is a **20-card “alpha set”**: 4 cards per School, spells only (no Conjurations), each using some of the 8 effects you defined.
+
+I’ll first restate the effect keywords very briefly, then list the cards grouped by School.
+
+---
+
+## Effect Keywords (quick reference)
+
+You already know these, but here’s the shorthand I’ll use on cards:
+
+* **DRAIN X** – When this spell deals **Vitality damage** to a wizard, you gain X Vitality.
+* **TORMENT** – If the target wizard has **5 or less Will after this resolves**, apply the extra “Torment” text.
+* **CHANNEL X** – The **next spell** you cast this turn costs X less Soulfire (to a minimum of 1).
+* **BURN X** – That wizard gains a Burn X marker: *at the start of their next turn, they take X Vitality damage*.
+* **WARD X** – Until end of turn, the next time this wizard would take Vitality damage, prevent X of that damage.
+* **RITUAL — [cost]** – You may pay the additional cost when casting this spell. If you do, use the upgraded effect instead.
+* **HAUNT — [text]** – While this card is in your Void, you may **exile** it to use the Haunt effect once.
+* **INSIGHT X** – Look at the top X cards of your deck. You may discard any number of them, then put the rest back on top in any order.
+
+---
+
+## BLOOD (self-sacrifice, life drain, blood magic)
+
+### 1. Bloodlash
+
+**School:** Blood
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Deal 3 damage to any wizard. You lose 1 Vitality.
+**DRAIN 1** (When this spell deals Vitality damage to a wizard, you gain 1 Vitality.)
+
+**Role:** Cheap, efficient burn that lets Blood decks spend their own life as a resource and then patch it up.
+
+---
+
+### 2. Sanguine Bargain
+
+**School:** Blood
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Lose 2 Vitality.
+**CHANNEL 2** (The next spell you cast this turn costs 2 less Soulfire, to a minimum of 1.)
+Draw 1 card.
+
+**Role:** Classic “pay life to accelerate” spell; powers big turns at the cost of making you fragile.
+
+---
+
+### 3. Blood Ward
+
+**School:** Blood
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Choose a wizard. Until end of turn, that wizard has **WARD 3**
+(Prevent the next 3 Vitality damage that would be dealt to that wizard this turn.)
+If you chose yourself, **DRAIN 1** the next time WARD prevents damage this turn.
+
+**Role:** Flexible defensive trick; best when used on yourself to convert prevention into a small heal.
+
+---
+
+### 4. Crimson Rite
+
+**School:** Blood
+**Type:** Ritual
+**Cost:** 3
+
+**Text:**
+Deal 3 damage to any target.
+**RITUAL — Lose 3 Vitality:** If you pay the Ritual cost, instead deal 5 damage to any target and this spell has **DRAIN 2**.
+
+**Role:** Mid-game finisher / removal; you decide when it’s worth burning your own Vitality for a big swing and partial heal-back.
+
+---
+
+## SHADOW (fear, discard, Will damage, trickery)
+
+### 5. Mind Fracture
+
+**School:** Shadow
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Target wizard loses 2 Will.
+**TORMENT —** If they have 5 or less Will after this resolves, they also discard 1 card.
+
+**Role:** Core Will-pressure spell; becomes nastier once you’ve pushed them low.
+
+---
+
+### 6. Whispered Secrets
+
+**School:** Shadow
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+**INSIGHT 3** (Look at the top 3 cards of your deck. You may discard any number of them, then put the rest back on top in any order.)
+Then draw 1 card and lose 1 Will.
+
+**Role:** Very Shadow-flavored card quality; you trade a bit of sanity for extremely smooth draws and graveyard setup.
+
+---
+
+### 7. Lingering Fear
+
+**School:** Shadow
+**Type:** Hex
+**Cost:** 3
+
+**Text:**
+Attach to an enemy wizard.
+At the start of that wizard’s turn, they lose 1 Will.
+**HAUNT —** From your Void, during your Main Phase, you may exile this card: target wizard loses 1 Will.
+
+**Role:** Slow, grinding Will damage that still does something even after it’s removed (via Haunt).
+
+---
+
+### 8. Dark Channeling
+
+**School:** Shadow
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Lose 1 Will.
+**CHANNEL 2** (The next spell you cast this turn costs 2 less Soulfire, to a minimum of 1.)
+**TORMENT —** If you have 5 or less Will after this resolves, the next spell you cast this turn instead costs 3 less Soulfire (to a minimum of 1).
+
+**Role:** Shadow’s version of “all-in”: use your own dwindling sanity as a power spike.
+
+---
+
+## FLAME (direct damage, aggression, pressure)
+
+### 9. Scorch
+
+**School:** Flame
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Deal 2 damage to any target.
+**BURN 1** (If you targeted a wizard, that wizard gains a Burn 1 marker: at the start of their next turn, they take 1 Vitality damage.)
+
+**Role:** Efficient early-game burn that leaves a small delayed sting.
+
+---
+
+### 10. Wildfire Surge
+
+**School:** Flame
+**Type:** Attack Spell
+**Cost:** 3
+
+**Text:**
+Deal 3 damage to target wizard.
+**BURN 2.**
+**CHANNEL 1** (The next spell you cast this turn costs 1 less Soulfire, to a minimum of 1.)
+
+**Role:** Aggro curve-topper: pushes face damage and helps you chain another spell in the same turn.
+
+---
+
+### 11. Overload Pyre
+
+**School:** Flame
+**Type:** Ritual
+**Cost:** 4
+
+**Text:**
+Deal 4 damage to target wizard.
+**RITUAL — Discard 1 card:** If you pay the Ritual cost, instead deal 4 damage to that wizard and **BURN 3** them.
+
+**Role:** Heavy closer for Flame; you pitch card advantage to put them on a lethal burn clock.
+
+---
+
+### 12. Blazing Focus
+
+**School:** Flame
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+**INSIGHT 2** (Look at the top 2 cards of your deck. You may discard any number of them, then put the rest back on top in any order.)
+Then deal 1 damage to yourself.
+
+**Role:** Lets aggressive decks dig for key burn pieces at the cost of a tiny self-hit.
+
+---
+
+## GRAVE (void recursion, attrition, death / Will pressure)
+
+### 13. Grave Echo
+
+**School:** Grave
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Target wizard loses 1 Will.
+**HAUNT —** From your Void, during your Main Phase, you may exile this card: target wizard loses 1 Will.
+
+**Role:** Simple, flexible Will ping that effectively hits twice over the whole game if you time Haunt well.
+
+---
+
+### 14. Unearthed Secrets
+
+**School:** Grave
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+**INSIGHT 3.**
+You may return up to 1 spell from your Void to your hand.
+Then lose 1 Will.
+
+**Role:** Glue card for Grave; fixes draws and turns your Void into a resource at the cost of sanity.
+
+---
+
+### 15. Ghastly Drain
+
+**School:** Grave
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Target wizard loses 2 Vitality.
+**DRAIN 1.**
+If that wizard has 3 or more cards in their Void, **DRAIN 2** instead.
+
+**Role:** Synergizes with long games and self-mill; Grave gets better as both Void piles grow.
+
+---
+
+### 16. Funeral Rite
+
+**School:** Grave
+**Type:** Ritual
+**Cost:** 3
+
+**Text:**
+Each player discards 1 card, then loses 1 Will.
+**RITUAL — Exile 1 card from your Void:** If you pay the Ritual cost, instead your opponent discards 1 card and loses 2 Will, and you lose no Will.
+
+**Role:** Classic Grave control piece; weaponizes your stocked Void into a big Will hit and hand disruption.
+
+---
+
+## HEX (curses, debuffs, taxes, control)
+
+### 17. Chains of Obligation
+
+**School:** Hex
+**Type:** Hex
+**Cost:** 2
+
+**Text:**
+Attach to an enemy wizard.
+The first spell that wizard casts each turn costs 1 additional Soulfire.
+**TORMENT —** If that wizard has 5 or less Will when this ability triggers, that spell instead costs 2 additional Soulfire.
+
+**Role:** Soft lock / tempo tax; brutal against low-Will opponents and good at slowing fast decks.
+
+---
+
+### 18. Misfortune Mark
+
+**School:** Hex
+**Type:** Hex
+**Cost:** 2
+
+**Text:**
+Attach to a wizard.
+Whenever that wizard takes **BURN** damage, they also lose 1 Will.
+**HAUNT —** From your Void, during your Main Phase, you may exile this card: give target wizard **BURN 1**.
+
+**Role:** Links Flame-style Burn to Will pressure; Haunt lets you splash a bit of delayed Burn even from the Void.
+
+---
+
+### 19. Cursed Insight
+
+**School:** Hex
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+**INSIGHT 2.**
+Each wizard loses 1 Will.
+
+**Role:** Symmetrical sanity tax; control decks that can recover their own Will (or finish quickly) get more mileage from it.
+
+---
+
+### 20. Hexbound Ward
+
+**School:** Hex
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Choose a wizard. That wizard gains **WARD 3** against Vitality damage until end of turn.
+**TORMENT —** If that wizard has 5 or less Will when this resolves, they also gain **WARD 1** against Will loss until end of turn
+(prevent the next 1 Will they would lose this turn).
+
+**Role:** Defensive curse that can protect either player; especially strong as a “last stand” when someone is low on Will.
+
+Here are 10 new cards, numbered 21–30, in the same format as your original glossary and using only effects from your existing Effects Glossary.
+
+---
+
+### 21. Crimson Cut
+
+**School:** Blood
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Deal 2 damage to any wizard.
+You lose 1 Vitality.
+
+**Role:** Super-simple Blood burn: efficient early chip damage that also nudges your own Vitality down for “life as a resource” play patterns without any keyword text to track.
+
+---
+
+### 22. Blood Tithe
+
+**School:** Blood
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Deal 2 damage to any wizard.
+You lose 1 Vitality.
+**DRAIN 2** (When this spell deals Vitality damage to a wizard, you gain 2 Vitality.)
+
+**Role:** A chunky life-swing tool for Blood decks. Compared to Ghastly Drain, this is always “on” but smaller in total numbers, giving Blood a reliable way to both hurt the enemy and patch itself up.
+
+---
+
+### 23. Veil Severance
+
+**School:** Shadow
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Dispel up to 2 Hexes attached to any wizards.
+For each Hex dispelled this way, its controller loses 1 Will.
+
+**Role:** Shadow’s “surgical” anti-curse tool. It clears multiple Hexes while lightly shredding the sanity of whoever relied on them, rewarding you for timing it when the board is cluttered with ongoing effects.
+
+---
+
+### 24. Night Whisper
+
+**School:** Shadow
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Target wizard discards 1 card.
+You lose 1 Will.
+
+**Role:** Ultra-clean discard spell. It’s cheap and proactive, but the Will payment keeps you honest and synergizes with Shadow’s “low Will” themes and Torment thresholds.
+
+---
+
+### 25. Firebolt
+
+**School:** Flame
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Deal 3 damage to any target.
+
+**Role:** Bread-and-butter burn. This is the straightforward “rate check” card for Flame decks—no Burn markers, no card filtering, just solid damage that fits cleanly anywhere on the curve.
+
+---
+
+### 26. Purging Flame
+
+**School:** Flame
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Dispel target Hex.
+Then deal 2 damage to that Hex’s controller.
+
+**Role:** Flame’s aggressive answer to long-term curses. You scorch a Hex off the board and turn its backlash into direct damage, helping burn decks punch through Hex-heavy control strategies.
+
+---
+
+### 27. Grave Purge
+
+**School:** Grave
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Dispel target Hex.
+Its controller loses 1 Will.
+
+**Role:** A very lean Grave-style answer to Hexes that also nudges the Will race. It slots neatly into slower, attrition-focused decks that want to keep the board clear while quietly eroding the opponent’s mind.
+
+---
+
+### 28. Bone Chill
+
+**School:** Grave
+**Type:** Attack Spell
+**Cost:** 1
+
+**Text:**
+Target wizard loses 1 Will.
+If that wizard has 3 or more cards in their Void, they lose 1 additional Will.
+
+**Role:** Simple Will poke that scales with game length and Void activity. Early it’s a small ping; later it becomes a clean 2-Will hit for a single Soulfire in the kinds of grindy games Grave wants.
+
+---
+
+### 29. Hexbreak Edict
+
+**School:** Hex
+**Type:** Attack Spell
+**Cost:** 2
+
+**Text:**
+Choose a wizard. Dispel up to 2 Hexes attached to that wizard.
+That wizard gains **WARD 2** until end of turn.
+
+**Role:** Flexible protection / reset button. Most often you’ll cast it on yourself to clear bad Hexes and gain a temporary Ward shield, but it can also be used politically in future multiplayer variants or to strip off “beneficial” Hexes later in the card pool.
+
+---
+
+### 30. Hex of Weariness
+
+**School:** Hex
+**Type:** Hex
+**Cost:** 1
+
+**Text:**
+Attach to an enemy wizard.
+At the end of that wizard’s turn, if they did not cast a spell this turn, they lose 1 Will.
+
+**Role:** A very basic but sneaky tax on passivity. It pressures opponents who want to bank cards or Soulfire, forcing them to choose between playing suboptimal spells or slowly bleeding Will over multiple turns.

@@ -1,0 +1,139 @@
+# Gothic Duel – Effects Glossary
+
+This section defines the nine named effects used in Gothic Duel.
+Each entry describes how the effect works on cards and includes explicit limits and stacking rules.
+
+---
+
+## 1. Drain
+
+**Rules Definition**
+**Drain N** – When this spell deals **Vitality damage** to a wizard, its controller **gains N Vitality**.
+* Drain only cares about **Vitality damage dealt by this spell**.
+* If the spell deals no Vitality damage (only Will damage, or other effects), Drain does nothing.
+* If the spell damages multiple wizards at once, it still triggers **once per resolution** of that spell.
+* Gained Vitality cannot push a wizard below 0 or beyond any maximum allowed by rules or card text.
+**Limits and Restrictions**
+* Drain triggers only from **damage dealt during resolution of that spell**; it does not track later effects or delayed damage.
+* Drain does not trigger from **Burn**, **Torment**, or other separate damage sources, even if they originate from the same card name.
+* In the core rules, Drain never triggers more than **once per casting** of a given spell.
+
+---
+
+## 2. Torment
+**Rules Definition**
+**Torment X** – After this spell resolves, if the enemy wizard’s **current Will is X or less**, apply the Torment effect printed on the card.
+* Torment checks the opponent’s Will **after** all normal effects of the spell have been applied.
+* Each card using Torment specifies its own threshold **X** (for example, Torment 7, Torment 5, Torment 3).
+* Torment is part of the same resolution; if the threshold is met, the Torment text happens immediately.
+**Limits and Restrictions**
+* Torment always checks the **single opposing wizard** in the game’s default two-player rules.
+* Torment only checks **once per resolution** of the spell. If multiple steps within the spell affect Will, they all happen before the single Torment check.
+* If the enemy wizard’s Will is above the listed threshold after the spell resolves, the Torment text has **no effect**.
+
+---
+
+## 3. Channel
+**Rules Definition**
+**Channel N** – The next spell the controller casts this turn costs **N less Soulfire**, to a minimum of **1 Soulfire**.
+* When a Channel effect resolves, it sets up a **temporary cost reduction**.
+* The reduction applies to the **next spell** that player casts **during that same turn**.
+* This reduction modifies only **Soulfire cost**; additional costs (Vitality, Will, discards, etc.) are unchanged.
+* A spell’s Soulfire cost cannot be reduced below **1**, unless a card explicitly states otherwise.
+**Limits and Restrictions**
+* If multiple Channel effects are active for a player at the same time, only the **single highest N** applies to the next spell; all lower Channel reductions are ignored for that spell.
+* After a spell has been cast using any Channel reduction, **all pending Channel reductions for that player are cleared**.
+* Channel effects do not carry over to future turns; any unused Channel at the end of the turn is lost.
+
+---
+
+## 4. Burn
+**Rules Definition**
+**Burn N** – A wizard with Burn N suffers **N Vitality damage at the start of that wizard’s turn**, as specified by card text.
+* When a wizard gains a **Burn N** marker:
+  * If that wizard already has a Burn marker with the **same N**, those markers combine into a single Burn marker with value **N + N** (for example, Burn 2 plus Burn 2 becomes Burn 4).
+  * Burn markers with **different N values** are tracked separately.
+* At the **start of that wizard’s turn**, each Burn marker on that wizard deals its listed damage.
+* The persistence of Burn (whether it is removed after triggering or remains) is determined by card text.
+**Limits and Restrictions**
+* Unless a card states otherwise, a Burn marker is **removed after it deals damage once**.
+* Burn always deals **Vitality damage** unless card text explicitly changes the type of damage.
+* Burn damage is applied after start-of-turn Soulfire refresh, but before the Draw Phase.
+* Burn can be prevented or reduced by effects such as **Ward**, following the general damage rules.
+
+---
+
+## 5. Ward
+**Rules Definition**
+**Ward N** – Prevent the next **N damage** that would be dealt to this wizard **this turn**.
+* Ward creates a **temporary damage shield**.
+* Each time this wizard would take Vitality or Will damage, that damage is reduced by up to the remaining Ward amount.
+* Once Ward has prevented a total of **N damage**, it is removed.
+**Limits and Restrictions**
+* Under the core rules, a wizard can only benefit from **one source of Ward per turn**:
+  * If a wizard already has any amount of Ward during a turn, additional Ward gained that same turn has **no further effect**, unless a card explicitly allows it to stack.
+* Ward applies to any damage type (Vitality or Will) unless the card granting Ward restricts it (for example, “Ward 3 against Vitality damage”).
+* Ward expires at the **end of the turn** in which it was gained, even if it did not prevent its full amount of damage, unless the card states a longer duration (“until your next turn,” etc.).
+
+---
+
+## 6. Ritual
+**Rules Definition**
+**Ritual – [alternative cost]: [Ritual effect]**
+A spell with Ritual is cast in one of two modes:
+1. **Base mode** – pay the normal cost and resolve the base text, or
+2. **Ritual mode** – pay the Ritual cost instead and resolve the **Ritual text**, which replaces the base text.
+* Ritual is always a **replacement mode**.
+* When Ritual mode is chosen, the base effect of the spell does **not** occur, unless the card specifically says that it does.
+**Limits and Restrictions**
+* Only a single mode is chosen when a spell with Ritual is cast; this choice is made as part of casting the spell and cannot be changed later in the resolution.
+* The Ritual cost may include Soulfire, Vitality, Will, or other requirements; all listed costs must be paid or the spell cannot be cast in Ritual mode.
+* A spell using Ritual mode still counts as **one spell cast**, for any effects that care about “spells cast this turn” or similar language.
+
+---
+
+## 7. Haunt
+**Rules Definition**
+**Haunt –** A card with Haunt can be used once from its owner’s **Void**, during that owner’s Main Phase, by exiling it from the Void to apply the printed Haunt effect.
+* When a card with Haunt is in its owner’s Void, it can be activated once more from that zone.
+* To activate Haunt:
+  * The card is **exiled from the Void** (removed from the game).
+  * The Haunt effect printed on the card then resolves.
+**Limits and Restrictions**
+* Each physical copy of a card can have its Haunt effect activated **only once per game**, because it is exiled as part of the cost.
+* Under the core rules, **a player may activate Haunt at most once per turn**, regardless of how many Haunt-capable cards are in that player’s Void.
+* Haunt can be activated only during the controller’s **Main Phase**, unless a card grants a different timing window.
+* Haunt follows normal targeting and legality rules; if all targets are illegal at resolution, the effect fizzles and the card remains exiled.
+
+---
+
+## 8. Insight
+**Rules Definition**
+**Insight N** – Look at the top **N cards** of your deck. Then put those cards back on top of the deck in any order.
+* Insight lets a player reorder upcoming draws without changing hand size.
+* If the deck contains fewer than N cards, the player looks at and rearranges **all remaining cards** in the deck.
+**Limits and Restrictions**
+* Insight never directly draws cards unless a card specifically combines Insight with drawing.
+* If Insight is used when the deck is nearly empty, normal **reshuffle and Will-loss rules** apply later when a draw effect actually occurs; Insight itself does not reshuffle the deck.
+* After an Insight effect resolves, the new top-of-deck order remains in place until changed by another effect or by drawing cards.
+
+---
+
+## 9. Dispel
+**Rules Definition**
+**Dispel** removes ongoing card-based effects from play, typically Hexes and buffs.
+Common text patterns include:
+* “Dispel target Hex.”
+* “Dispel up to N Hexes from target wizard.”
+* “Dispel all Hexes and ongoing buffs.”
+When a card is **dispelled**:
+* Remove that card from the battlefield or from being attached.
+* Place it into its owner’s **Discard**, unless a card or rule specifies another destination.
+* Any continuous or repeating effects from that card end immediately.
+**Limits and Restrictions**
+* Dispel affects only **ongoing card-based effects** that remain in play (such as Hexes and future buff-type permanents).
+* Dispel does **not** retroactively cancel one-shot effects that have already resolved.
+* Dispel does not inherently remove **status markers** such as Burn or Ward; such markers are removed only if an effect explicitly says it can remove them.
+* If a single effect attempts to Dispel more targets than exist (for example, “Dispel up to 3 Hexes” when only 1 Hex is present), it removes as many legal targets as possible and then finishes resolving.
+
+---

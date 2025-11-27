@@ -1,0 +1,191 @@
+# GOTHIC DUEL – INSTRUCTION MANUAL (UPDATED)
+
+## 1. Overview
+Gothic Duel is a fast-paced card game for **2 players**.
+Each player is a dark wizard using forbidden magic to destroy the other’s **body** and **mind**.
+Each wizard has:
+* **20 Vitality** – physical life
+* **10 Will** – sanity, mental stability
+Wizards cast spells using **Soulfire**, their magical energy.
+A player **loses** the game immediately if:
+* Vitality is reduced to **0**, or
+* Will is reduced to **0**.
+Games are designed to be short, typically ending in around **10 turns** total.
+
+---
+
+## 2. Components
+Each player uses:
+1. **Wizard board or card**
+   * Tracks current **Vitality**
+   * Tracks current **Will**
+   * Tracks markers such as **Burn**, **Ward**, and attached **Hexes**
+2. **Deck of 20 cards**
+   * The wizard’s spellbook
+   * Contains Spells and Hexes from various Schools of magic
+3. **Trackers or UI elements**
+   * **Soulfire** (current and maximum)
+   * **Status markers** (Burn, Ward, etc.)
+
+---
+
+## 3. Card Types
+### 3.1 Spells
+* One-shot effects: damage, healing, resource manipulation, card filtering, and so on.
+* After a Spell resolves, it is placed into its owner’s **Discard** unless the card text says otherwise.
+### 3.2 Hexes
+* Ongoing **curses** that attach to a wizard (self or enemy).
+* A Hex remains in play and continues to apply its effect until:
+  * It is **dispelled**,
+  * It **expires** due to its own rules, or
+  * The game ends.
+
+---
+
+## 4. Zones
+Each player manages several zones:
+1. **Deck**
+   * Face-down pile from which cards are drawn.
+2. **Hand**
+   * Cards currently held and available to play.
+   * Default maximum hand size is **7**.
+   * At the end of each turn, if a player has more than 7 cards in hand, that player discards down to 7.
+3. **Discard**
+   * Face-up pile of used or destroyed cards that are no longer in play.
+4. **Void**
+   * Face-up pile of cards that have been **removed from normal play** (exiled).
+   * Some effects, such as **Haunt**, can still use cards in the Void.
+   * **Both players may inspect all cards in either Void at any time.**
+5. **In Play**
+   * Attached Hexes and any other ongoing card effects that remain on the table.
+
+---
+
+## 5. Setup
+
+1. Each player chooses or is assigned a **Wizard** and places it in front of them.
+2. Each player shuffles their **20-card deck** and places it face down as their Deck.
+3. Randomly determine who will take the **first turn**.
+4. Each player draws an opening hand of **5 cards**.
+5. **Second-player compensation:**
+   * The player who goes **second** draws **1 additional card** (starting with **6 cards** in hand).
+   * The player who goes **first** skips the **Draw Phase of their first turn** (does not draw a card on that first turn).
+6. Each wizard starts with:
+   * **20 Vitality**
+   * **10 Will**
+   * **Maximum Soulfire = 3**
+   * **Current Soulfire = 3**
+Vitality, Will, and Soulfire values **never go below 0**.
+If an effect would reduce a value below 0, that value remains at 0 instead.
+
+---
+
+## 6. Soulfire
+
+### 6.1 Maximum and Current Soulfire
+Each wizard has:
+* **Maximum Soulfire** – the cap for how much Soulfire can be held.
+* **Current Soulfire** – what is available to spend on spells during the turn.
+At the beginning of each of that player’s turns:
+1. Maximum Soulfire increases by **1**, up to a maximum of **10**.
+2. Current Soulfire is then set to equal Maximum Soulfire.
+Soulfire is primarily spent to **pay Spell and Hex costs**.
+Additional costs (such as paying Vitality or Will) are always listed on the card.
+
+---
+
+## 7. Turn Structure
+On a player’s turn, the following sequence is used.
+### 7.1 Start of Turn
+In this order:
+1. **Increase Maximum Soulfire**
+   * Increase Maximum Soulfire by **1**, up to a maximum of **10**.
+2. **Refresh Current Soulfire**
+   * Set Current Soulfire equal to Maximum Soulfire.
+3. **Resolve “Start of Turn” effects**
+   * Resolve all effects that state “**At the start of your turn…**”.
+   * If multiple such effects are waiting (Burn, Hexes, etc.), the active player chooses the order in which their own effects resolve.
+   * Damage and other changes are applied immediately.
+   * If Vitality or Will is reduced to **0** at this time, the wizard loses the game immediately.
+
+### 7.2 Draw Phase
+* Normally, the active player **draws 1 card** from their Deck.
+* On the game’s very first turn, the first player **does not draw** during this phase.
+#### Deck Reshuffle and Will Loss
+When a player must draw a card and that player’s Deck is empty, perform a **Reshuffle**:
+1. **Gather cards to reshuffle**
+   * Collect all of that player’s cards that are:
+     * In that player’s **Discard**,
+     * In that player’s **Void**,
+     * In play as ongoing cards (such as attached Hexes).
+   * Do **not** gather cards currently in the player’s hand or the wizard card itself.
+2. **End all ongoing effects from those cards**
+   * Any Hexes or other ongoing cards removed from play this way stop applying their effects.
+3. **Form a new Deck**
+   * Shuffle all gathered cards together.
+   * Place them face down as the player’s new Deck.
+4. **Draw the required card**
+   * The player then draws the card(s) that were being drawn when the Deck was found to be empty.
+Once a player has performed a Reshuffle at least once during the game:
+* That player loses **1 Will at the end of each of their turns** in which that player **drew at least one card from their Deck** during that turn (including the draw that immediately followed the Reshuffle).
+* This Will loss is **once per turn**, regardless of how many cards were drawn that turn.
+There is no immediate automatic loss for running out of cards.
+Instead, the Reshuffle restores access to played cards, while the ongoing Will loss pressures the game toward a conclusion.
+
+### 7.3 Main Phase
+During the Main Phase, the active player may:
+* Play **Spells** and **Hexes** by paying their costs.
+* Use abilities printed on cards that allow use during the Main Phase (such as **Haunt** from the Void).
+* Take actions in any order, as long as costs and targeting rules are followed.
+* End the turn.
+There are **no instant-speed spells** and **no stack**:
+* Cards and abilities can **only** be played during the controlling player’s own Main Phase, unless a card explicitly states otherwise.
+* Once a Spell or ability is played and its costs are paid, it resolves immediately in the order it was played.
+
+### 7.4 End Phase
+At the end of the active player’s turn:
+1. Resolve any “**At the end of your turn…**” effects.
+2. Check hand size:
+   * If the player has more than **7** cards in hand, that player discards down to 7.
+3. If the player has previously reshuffled and drew at least one card from the Deck this turn, that player **loses 1 Will** (see Reshuffle rules).
+4. The turn ends and the opposing player becomes the active player.
+
+---
+
+## 8. Damage, Healing, and Loss
+
+### 8.1 Vitality and Will
+* Damage to Vitality reduces the wizard’s **physical life**.
+* Damage to Will reduces the wizard’s **sanity and resolve**.
+* Healing effects restore Vitality or Will up to their starting values:
+  * Vitality cannot exceed 20 unless a card specifically allows it.
+  * Will cannot exceed 10 unless a card specifically allows it.
+* Vitality and Will never go below 0.
+* A wizard loses the game immediately if Vitality or Will reaches **0**.
+### 8.2 Damage Prevention and Modification
+Before damage is applied:
+1. Apply any prevention effects (such as **Ward**) or reductions specified by cards.
+2. Apply remaining damage to the appropriate value (Vitality or Will).
+Effects such as **Burn**, **Torment**, **Drain**, and others modify how damage is dealt and resolved; details appear in the **Effects Glossary**.
+
+---
+
+## 9. Targeting and Illegal Targets
+* When playing a Spell or Hex requiring a target, a legal target must be chosen as part of the casting.
+* If all chosen targets become illegal before resolution (for example, by leaving play or gaining immunity), the effect **fizzles** and does nothing.
+* If an effect has multiple targets and some remain legal:
+  * The effect resolves as much as possible on the remaining legal targets.
+
+---
+
+## 10. No Instants or Reactions (Turn Structure Philosophy)
+Gothic Duel uses a simple, front-facing timing structure:
+* No instant-speed cards are present in the core rules.
+* No reactive play occurs during an opponent’s turn unless a special rule or future card type explicitly introduces it.
+* Planning, resource management, and visible board state are intended to be the main sources of depth, rather than hidden timing tricks.
+
+---
+
+## 11. Keywords and Effects
+Detailed definitions and usage notes for Drain, Torment, Channel, Burn, Ward, Ritual, Haunt, Insight, and Dispel are provided in the **Effects Glossary** below.
+These rules and effect definitions form the core reference for Gothic Duel.

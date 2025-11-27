@@ -161,39 +161,18 @@ function renderCardGrid(cards) {
 
     const meta = document.createElement('div');
     meta.className = 'card-meta';
-    const badgeLeft = document.createElement('span');
-    badgeLeft.className = 'badge';
-    badgeLeft.textContent = `${card.school} • ${card.cardType}`;
-    const badgeRight = document.createElement('span');
-    badgeRight.className = 'badge';
-    badgeRight.textContent = `Cost ${card.cost?.soulfire ?? 0}`;
-    meta.append(badgeLeft, badgeRight);
 
-    const text = document.createElement('p');
-    text.className = 'card-text';
-    text.textContent = card.rulesText;
+    const type = document.createElement('span');
+    type.className = 'badge';
+    type.textContent = card.cardType;
 
-    const tagRow = document.createElement('div');
-    tagRow.className = 'tags';
-    buildTags(card).forEach((tag) => {
-      const chip = document.createElement('span');
-      chip.textContent = tag;
-      tagRow.appendChild(chip);
-    });
+    const cost = document.createElement('span');
+    cost.className = 'badge';
+    cost.textContent = `Cost ${card.cost?.soulfire ?? 0}`;
 
-    const actions = document.createElement('div');
-    actions.className = 'card-actions';
-    const addButton = document.createElement('button');
-    addButton.className = 'cta tiny';
-    addButton.textContent = 'Add';
-    addButton.addEventListener('click', (event) => {
-      event.stopPropagation();
-      addToDeck(card);
-    });
-    addButton.addEventListener('pointerdown', (event) => event.stopPropagation());
-    actions.appendChild(addButton);
+    meta.append(type, cost);
 
-    tile.append(title, meta, text, tagRow, actions);
+    tile.append(title, meta);
 
     let holdTimeout;
     let holdTriggered = false;

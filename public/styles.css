@@ -23,7 +23,6 @@ body {
   padding: 48px 16px 40px;
   position: relative;
   overflow-x: hidden;
-  overflow-y: hidden;
 }
 
 .noise {
@@ -284,13 +283,8 @@ h1 {
 }
 
 .deck-builder {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
   gap: 18px;
   min-height: 80vh;
-  height: min(900px, calc(100vh - 140px));
-  max-height: calc(100vh - 140px);
-  overflow: hidden;
 }
 
 .deck-layout {
@@ -298,8 +292,6 @@ h1 {
   grid-template-columns: 1.4fr 1fr;
   grid-template-areas: 'browser deck';
   gap: 14px;
-  height: 100%;
-  min-height: 0;
 }
 
 .card-browser,
@@ -307,11 +299,10 @@ h1 {
   border: 2px solid var(--fg);
   background: #000;
   padding: 14px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 12px;
-  min-height: 0;
-  overflow: hidden;
+  min-height: 540px;
+  overflow: auto;
 }
 
 .deck-panel {
@@ -335,29 +326,25 @@ h1 {
   gap: 10px;
   align-items: center;
 }
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 10px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
-  min-height: 0;
-  flex: 1;
-}
 
-.card-tile {
-  border: 2px solid var(--fg);
-  background: #0a0a0a;
-  padding: 12px 10px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  cursor: pointer;
-  transition: border-color 120ms ease, transform 120ms ease;
-  min-height: 160px;
-}
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-auto-rows: 1fr;
+    gap: 10px;
+  }
+
+  .card-tile {
+    border: 2px solid var(--fg);
+    background: #0a0a0a;
+    padding: 12px 10px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 120ms ease, transform 120ms ease;
+    min-height: 160px;
+  }
 
 .card-tile:hover {
   border-color: #fff;
@@ -455,7 +442,7 @@ h1 {
 }
 
 .deck-panel {
-  align-self: stretch;
+  align-self: start;
 }
 
 .deck-list {
@@ -464,9 +451,6 @@ h1 {
   margin: 0;
   display: grid;
   gap: 8px;
-  overflow-y: auto;
-  padding-right: 4px;
-  flex: 1;
 }
 
 .deck-item {
@@ -511,29 +495,6 @@ code {
   border: 1px solid var(--border);
 }
 
-.filter-panel {
-  border: 2px solid var(--fg);
-  background: #000;
-  padding: 12px 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.filter-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.filter-toggle {
-  white-space: nowrap;
-}
-
-.filter-panel.collapsed .filters {
-  display: none;
-}
-
 @media (max-width: 960px) {
   .deck-layout {
     grid-template-columns: 1fr;
@@ -564,7 +525,7 @@ code {
   .filters {
     width: 100%;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
   .deck-name {
@@ -573,14 +534,12 @@ code {
 
   .deck-builder {
     gap: 14px;
-    height: calc(100vh - 120px);
   }
 
   .deck-layout {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(220px, 0.9fr) minmax(320px, 1.1fr);
-    height: 100%;
-    min-height: 0;
+    height: calc(100vh - 220px);
   }
 
   .card-browser,

@@ -534,25 +534,28 @@ code {
 
 @media (max-width: 960px) {
   .deck-layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .deck-panel,
+  .card-browser {
+    min-height: auto;
   }
 
   .deck-panel {
-    position: fixed;
-    bottom: 12px;
-    left: 12px;
-    right: 12px;
-    max-height: 48vh;
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
-    z-index: 2;
+    position: static;
+    max-height: none;
+    order: 1;
+    box-shadow: none;
   }
 
   .deck-panel.collapsed {
-    max-height: 62px;
+    max-height: none;
   }
 
   .card-browser {
-    min-height: 60vh;
+    order: 2;
   }
 
   .card-grid {
@@ -584,17 +587,6 @@ code {
 
   .chip-row {
     grid-auto-columns: minmax(90px, 1fr);
-  }
-
-  .deck-panel {
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-  }
-
-  .card-browser,
-  .deck-panel {
-    min-height: auto;
   }
 
   .card-grid {

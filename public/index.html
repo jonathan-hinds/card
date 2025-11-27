@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gothic Arcade | Player Ledger</title>
+    <title>Black Gate</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,16 +13,16 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="grain"></div>
-    <header class="hero">
-      <p class="eyebrow">Gothic Arcade</p>
-      <h1>Sign the Ledger</h1>
-      <p class="lede">Black-and-white echoes welcome only the bold. Register or return to your vigil.</p>
+    <div class="noise"></div>
+    <header class="masthead">
+      <p class="tag">Access Terminal</p>
+      <h1>BLACK GATE</h1>
+      <p class="hint">Monochrome only. Choose your path.</p>
     </header>
 
-    <main class="layout">
-      <section class="panel form-panel">
-        <div class="tab-group" role="tablist">
+    <main class="console">
+      <section class="auth-block">
+        <div class="tab-row" role="tablist">
           <button class="tab active" data-target="register" aria-selected="true" role="tab">Register</button>
           <button class="tab" data-target="login" aria-selected="false" role="tab">Login</button>
         </div>
@@ -30,57 +30,39 @@
         <form id="register-form" class="auth-form" autocomplete="off">
           <label class="field">
             <span>Handle</span>
-            <input name="username" type="text" placeholder="ashen-wanderer" required />
+            <input name="username" type="text" required />
           </label>
           <label class="field">
-            <span>Secret Phrase</span>
-            <input name="password" type="password" placeholder="••••••••" required />
+            <span>Passphrase</span>
+            <input name="password" type="password" required />
           </label>
-          <button type="submit" class="cta">Carve My Name</button>
-          <p class="form-hint">Your handle must be unique. The ledger lives in MongoDB.</p>
+          <button type="submit" class="cta">Commit</button>
         </form>
 
         <form id="login-form" class="auth-form hidden" autocomplete="off">
           <label class="field">
             <span>Handle</span>
-            <input name="username" type="text" placeholder="ashen-wanderer" required />
+            <input name="username" type="text" required />
           </label>
           <label class="field">
-            <span>Secret Phrase</span>
-            <input name="password" type="password" placeholder="••••••••" required />
+            <span>Passphrase</span>
+            <input name="password" type="password" required />
           </label>
-          <button type="submit" class="cta">Return to the Gate</button>
-          <p class="form-hint">We verify the sigils using secure hashing.</p>
+          <button type="submit" class="cta">Enter</button>
         </form>
 
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </section>
 
-      <section class="panel lore-panel">
-        <div class="marquee">█░█░ Shadows stirring ░█░█</div>
-        <div class="lore">
-          <p>
-            The game is still summoning its mechanics. For now, the ledger remembers every soul brave enough
-            to enter. Authentication is powered by MongoDB and hardened secrets.
-          </p>
-          <ul class="list">
-            <li>Register to etch a new player entry in the database.</li>
-            <li>Login to retrieve your token and keep watch.</li>
-            <li>Your session token is stored locally for the coming rituals.</li>
-          </ul>
-          <div class="profile" id="profile-card" hidden>
-            <p class="label">Current Wanderer</p>
-            <p class="value" id="profile-name">—</p>
-            <p class="muted" id="profile-meta"></p>
-            <button class="ghost" id="logout">Sign Out</button>
-          </div>
-        </div>
+      <section class="profile-block" id="profile-card" hidden>
+        <p class="label">Current session</p>
+        <p class="value" id="profile-name">—</p>
+        <p class="muted" id="profile-meta"></p>
+        <button class="ghost" id="logout">Logout</button>
       </section>
     </main>
 
-    <footer class="footer">
-      <p>Dark, mysterious, and waiting. Health check at <code>/health</code>.</p>
-    </footer>
+    <footer class="foot">Health check at <code>/health</code></footer>
 
     <script src="script.js"></script>
   </body>

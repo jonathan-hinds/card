@@ -95,11 +95,22 @@
         </header>
 
         <div class="deck-layout">
+          <aside class="deck-panel">
+            <div class="panel-head">
+              <div>
+                <p class="label">Deck list</p>
+                <p class="muted">Tap a card to remove</p>
+              </div>
+              <button class="ghost" id="clear-deck">Clear</button>
+            </div>
+            <ul class="deck-list" id="deck-list"></ul>
+          </aside>
+
           <div class="card-browser">
             <div class="browser-head">
               <div>
                 <p class="label">All cards</p>
-                <p class="muted">Browse the full glossary and tap to add</p>
+                <p class="muted">Swipe to browse, hold to inspect, tap add</p>
               </div>
               <div class="filters">
                 <label class="field inline">
@@ -118,23 +129,30 @@
             </div>
             <div class="card-grid" id="card-grid"></div>
           </div>
-
-          <aside class="deck-panel">
-            <div class="panel-head">
-              <div>
-                <p class="label">Deck list</p>
-                <p class="muted">Tap a card to remove</p>
-              </div>
-              <button class="ghost" id="clear-deck">Clear</button>
-            </div>
-            <ul class="deck-list" id="deck-list"></ul>
-          </aside>
         </div>
         <div class="status" id="deck-status" role="status" aria-live="polite"></div>
       </section>
     </main>
 
     <footer class="foot">Health check at <code>/health</code></footer>
+
+    <div class="modal hidden" id="card-modal" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" id="modal-backdrop"></div>
+      <div class="modal-body">
+        <header class="modal-head">
+          <div>
+            <p class="label" id="modal-title">—</p>
+            <div class="modal-meta" id="modal-meta"></div>
+          </div>
+          <button class="ghost" id="close-modal">Close</button>
+        </header>
+        <p class="modal-text" id="modal-text"></p>
+        <div class="tags" id="modal-tags"></div>
+        <div class="modal-actions">
+          <button class="cta" id="modal-add">Add to Deck</button>
+        </div>
+      </div>
+    </div>
 
     <script src="script.js"></script>
   </body>

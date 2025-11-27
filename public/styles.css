@@ -20,10 +20,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 16px 40px;
+  padding: 32px 14px 28px;
   position: relative;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 .noise {
@@ -83,6 +82,7 @@ h1 {
   display: grid;
   gap: 16px;
   z-index: 1;
+  min-height: 0;
 }
 
 .panel {
@@ -284,21 +284,32 @@ h1 {
 }
 
 .deck-builder {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 18px;
-  min-height: 80vh;
-  height: min(900px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  height: calc(100vh - 140px);
   max-height: calc(100vh - 140px);
   overflow: hidden;
 }
 
-.deck-layout {
+.deck-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.deck-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  grid-template-areas: 'browser deck';
-  gap: 14px;
-  height: 100%;
+  grid-template-columns: 1.35fr 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'filters filters'
+    'browser deck';
+  gap: 12px;
+  flex: 1;
   min-height: 0;
 }
 
@@ -334,6 +345,7 @@ h1 {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .card-grid {
   display: grid;
@@ -512,6 +524,7 @@ code {
 }
 
 .filter-panel {
+  grid-area: filters;
   border: 2px solid var(--fg);
   background: #000;
   padding: 12px 14px;
@@ -535,11 +548,18 @@ code {
 }
 
 @media (max-width: 960px) {
-  .deck-layout {
+  .deck-grid {
     grid-template-columns: 1fr;
     grid-template-areas:
-      'deck'
-      'browser';
+      'filters'
+      'browser'
+      'deck';
+    grid-template-rows: auto minmax(260px, 1fr) minmax(220px, 0.9fr);
+  }
+
+  .deck-builder {
+    height: calc(100vh - 130px);
+    max-height: calc(100vh - 130px);
   }
 
   .card-grid {
@@ -549,7 +569,7 @@ code {
 
 @media (max-width: 520px) {
   body {
-    padding: 32px 12px 28px;
+    padding: 24px 12px 22px;
   }
 
   h1 {
@@ -572,15 +592,13 @@ code {
   }
 
   .deck-builder {
-    gap: 14px;
+    gap: 12px;
     height: calc(100vh - 120px);
+    max-height: calc(100vh - 120px);
   }
 
-  .deck-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(220px, 0.9fr) minmax(320px, 1.1fr);
-    height: 100%;
-    min-height: 0;
+  .deck-grid {
+    grid-template-rows: auto minmax(230px, 0.95fr) minmax(280px, 1.05fr);
   }
 
   .card-browser,

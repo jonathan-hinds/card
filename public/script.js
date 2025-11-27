@@ -155,9 +155,18 @@ function renderCardGrid(cards) {
     tile.className = 'card-tile';
     tile.dataset.slug = card.slug;
 
+    const header = document.createElement('div');
+    header.className = 'card-header';
+
     const title = document.createElement('p');
     title.className = 'card-title';
     title.textContent = card.name;
+
+    const cost = document.createElement('p');
+    cost.className = 'card-cost';
+    cost.textContent = `${card.cost?.soulfire ?? 0}`;
+
+    header.append(title, cost);
 
     const meta = document.createElement('div');
     meta.className = 'card-meta';
@@ -166,13 +175,17 @@ function renderCardGrid(cards) {
     type.className = 'badge';
     type.textContent = card.cardType;
 
-    const cost = document.createElement('span');
-    cost.className = 'badge';
-    cost.textContent = `Cost ${card.cost?.soulfire ?? 0}`;
+    const school = document.createElement('span');
+    school.className = 'badge';
+    school.textContent = card.school;
 
-    meta.append(type, cost);
+    meta.append(type, school);
 
-    tile.append(title, meta);
+    const body = document.createElement('p');
+    body.className = 'card-text';
+    body.textContent = card.rulesText;
+
+    tile.append(header, body, meta);
 
     let holdTimeout;
     let holdTriggered = false;

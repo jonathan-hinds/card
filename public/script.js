@@ -1,8 +1,6 @@
 const MAX_DECK_SIZE = 20;
 const MAX_COPIES_PER_CARD = 3;
 
-const pageBody = document.body;
-
 const tabs = document.querySelectorAll('.tab');
 const registerForm = document.getElementById('register-form');
 const loginForm = document.getElementById('login-form');
@@ -59,7 +57,6 @@ function showScreen(view) {
   authPanel.classList.toggle('hidden', view !== 'auth');
   mainMenu.classList.toggle('hidden', view !== 'menu');
   deckBuilder.classList.toggle('hidden', view !== 'deck');
-  pageBody.classList.toggle('deck-mode', view === 'deck');
 }
 
 function renderProfile(username) {

@@ -25,16 +25,6 @@ body {
   overflow-x: hidden;
 }
 
-body.deck-mode {
-  padding: 16px 12px 18px;
-  overflow: hidden;
-}
-
-body.deck-mode .masthead,
-body.deck-mode .foot {
-  display: none;
-}
-
 .noise {
   position: fixed;
   inset: 0;
@@ -92,12 +82,6 @@ h1 {
   display: grid;
   gap: 16px;
   z-index: 1;
-}
-
-body.deck-mode .console {
-  width: 100%;
-  height: 100%;
-  max-width: 1180px;
 }
 
 .panel {
@@ -298,86 +282,69 @@ body.deck-mode .console {
   color: var(--muted);
 }
 
-
 .deck-builder {
+  gap: 18px;
+  min-height: 80vh;
+}
+
+.deck-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-areas: 'browser deck';
   gap: 14px;
-  min-height: 0;
-  height: calc(100vh - 180px);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  overflow: hidden;
 }
 
-.builder-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-rows: auto minmax(180px, 0.45fr) 1fr;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.filter-panel,
-.deck-panel,
-.card-panel {
+.card-browser,
+.deck-panel {
   border: 2px solid var(--fg);
   background: #000;
   padding: 14px;
   display: grid;
   gap: 12px;
-  min-height: 0;
-}
-
-.filter-panel {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  min-height: 540px;
+  overflow: auto;
 }
 
 .deck-panel {
-  grid-template-rows: auto 1fr;
-  overflow: hidden;
+  grid-area: deck;
 }
 
-.card-panel {
-  grid-template-rows: auto 1fr;
-  overflow: hidden;
+.card-browser {
+  grid-area: browser;
 }
 
-.browser-head,
-.panel-head.inline {
+.browser-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
 }
 
 .filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
   gap: 10px;
   align-items: center;
-  width: 100%;
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  grid-auto-rows: 1fr;
-  gap: 10px;
-}
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-auto-rows: 1fr;
+    gap: 10px;
+  }
 
-.card-tile {
-  border: 2px solid var(--fg);
-  background: #0a0a0a;
-  padding: 12px 10px;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 8px;
-  cursor: pointer;
-  transition: border-color 120ms ease, transform 120ms ease;
-  min-height: 160px;
-}
+  .card-tile {
+    border: 2px solid var(--fg);
+    background: #0a0a0a;
+    padding: 12px 10px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 120ms ease, transform 120ms ease;
+    min-height: 160px;
+  }
 
 .card-tile:hover {
   border-color: #fff;
@@ -484,9 +451,6 @@ body.deck-mode .console {
   margin: 0;
   display: grid;
   gap: 8px;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .deck-item {
@@ -517,12 +481,6 @@ body.deck-mode .console {
   padding: 6px 8px;
 }
 
-.card-panel .card-grid {
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
 .foot {
   margin-top: 20px;
   color: var(--muted);
@@ -538,12 +496,11 @@ code {
 }
 
 @media (max-width: 960px) {
-  .deck-builder {
-    height: calc(100vh - 160px);
-  }
-
-  .builder-grid {
-    grid-template-rows: auto minmax(200px, 0.5fr) 1fr;
+  .deck-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'deck'
+      'browser';
   }
 
   .card-grid {
@@ -556,10 +513,6 @@ code {
     padding: 32px 12px 28px;
   }
 
-  body.deck-mode {
-    padding: 12px 10px 14px;
-  }
-
   h1 {
     font-size: clamp(22px, 8vw, 30px);
   }
@@ -570,7 +523,9 @@ code {
   }
 
   .filters {
-    grid-template-columns: 1fr;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .deck-name {
@@ -578,16 +533,17 @@ code {
   }
 
   .deck-builder {
-    gap: 12px;
-    height: calc(100vh - 140px);
+    gap: 14px;
   }
 
-  .builder-grid {
-    grid-template-rows: auto minmax(200px, 0.55fr) 1fr;
+  .deck-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 0.9fr) minmax(320px, 1.1fr);
+    height: calc(100vh - 220px);
   }
 
-  .deck-panel,
-  .card-panel {
+  .card-browser,
+  .deck-panel {
     min-height: auto;
     max-height: none;
     border-width: 2px;

@@ -58,7 +58,7 @@ function clearSession() {
 
 function renderProfile(username) {
   profileName.textContent = username;
-  profileMeta.textContent = 'Keeper of the monochrome realm';
+  profileMeta.textContent = 'Monochrome session active';
   profileCard.hidden = false;
 }
 
@@ -111,7 +111,7 @@ async function hydrateProfile() {
     const data = await res.json();
     const username = data.player.username;
     renderProfile(username);
-    showStatus('Session restored. The gate remembers you.', 'success');
+    showStatus('Session restored.', 'success');
   } catch (error) {
     clearSession();
     showStatus(error.message, 'error');

@@ -94,6 +94,30 @@
           </div>
         </header>
 
+        <section class="filter-panel" id="filter-panel">
+          <div class="filter-head">
+            <div>
+              <p class="label">Filters</p>
+              <p class="muted">Collapse to maximize card space</p>
+            </div>
+            <button class="ghost filter-toggle" id="toggle-filters" aria-expanded="true">Hide Filters</button>
+          </div>
+          <div class="filters" id="filter-controls">
+            <label class="field inline">
+              <span>Search</span>
+              <input type="text" id="card-search" placeholder="Name, school, text" />
+            </label>
+            <select id="school-filter" class="select">
+              <option value="">All Schools</option>
+              <option value="Blood">Blood</option>
+              <option value="Shadow">Shadow</option>
+              <option value="Flame">Flame</option>
+              <option value="Grave">Grave</option>
+              <option value="Hex">Hex</option>
+            </select>
+          </div>
+        </section>
+
         <div class="deck-layout">
           <aside class="deck-panel">
             <div class="panel-head">
@@ -111,20 +135,6 @@
               <div>
                 <p class="label">All cards</p>
                 <p class="muted">Swipe to browse, hold to inspect, tap add</p>
-              </div>
-              <div class="filters">
-                <label class="field inline">
-                  <span>Search</span>
-                  <input type="text" id="card-search" placeholder="Name, school, text" />
-                </label>
-                <select id="school-filter" class="select">
-                  <option value="">All Schools</option>
-                  <option value="Blood">Blood</option>
-                  <option value="Shadow">Shadow</option>
-                  <option value="Flame">Flame</option>
-                  <option value="Grave">Grave</option>
-                  <option value="Hex">Hex</option>
-                </select>
               </div>
             </div>
             <div class="card-grid" id="card-grid"></div>

@@ -74,10 +74,10 @@ app.post('/api/auth/register', async (req, res) => {
 
     await collection.insertOne(user);
     const token = createToken({ username: user.username, createdAt: Date.now() });
-    res.status(201).json({ message: 'Player registered successfully.', token, username: user.username });
+    res.status(201).json({ message: 'Account created successfully.', token, username: user.username });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ message: 'That handle is already watching the shadows.' });
+      return res.status(409).json({ message: 'That username is already taken.' });
     }
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Failed to register player.' });
@@ -94,17 +94,17 @@ app.post('/api/auth/login', async (req, res) => {
     const collection = await ensureDatabase();
     const player = await collection.findOne({ username: username.toLowerCase() });
     if (!player) {
-      return res.status(401).json({ message: 'No such wanderer has signed the ledger.' });
+      return res.status(401).json({ message: 'Username not found.' });
     }
 
     const salt = Buffer.from(player.salt, 'hex');
     const hash = crypto.scryptSync(password, salt, 64).toString('hex');
     if (!crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(player.passwordHash, 'hex'))) {
-      return res.status(401).json({ message: 'The sigils do not match.' });
+      return res.status(401).json({ message: 'Incorrect password.' });
     }
 
     const token = createToken({ username: player.username, createdAt: Date.now() });
-    res.json({ message: 'Welcome back to the abyss.', token, username: player.username });
+    res.json({ message: 'Logged in successfully.', token, username: player.username });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Failed to log in.' });

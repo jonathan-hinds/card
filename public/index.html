@@ -94,52 +94,50 @@
           </div>
         </header>
 
-        <div class="deck-workspace">
-          <div class="deck-grid">
-            <section class="filter-panel" id="filter-panel">
-              <div class="filter-head">
-                <div>
-                  <p class="label">Filters</p>
-                  <p class="muted">Collapse to maximize card space</p>
-                </div>
-                <button class="ghost filter-toggle" id="toggle-filters" aria-expanded="true">Hide Filters</button>
-              </div>
-              <div class="filters" id="filter-controls">
-                <label class="field inline">
-                  <span>Search</span>
-                  <input type="text" id="card-search" placeholder="Name, school, text" />
-                </label>
-                <select id="school-filter" class="select">
-                  <option value="">All Schools</option>
-                  <option value="Blood">Blood</option>
-                  <option value="Shadow">Shadow</option>
-                  <option value="Flame">Flame</option>
-                  <option value="Grave">Grave</option>
-                  <option value="Hex">Hex</option>
-                </select>
-              </div>
-            </section>
-
-            <div class="card-browser">
-              <div class="browser-head">
-                <div>
-                  <p class="label">All cards</p>
-                  <p class="muted">Swipe to browse, hold to inspect, tap add</p>
-                </div>
-              </div>
-              <div class="card-grid" id="card-grid"></div>
+        <section class="filter-panel" id="filter-panel">
+          <div class="filter-head">
+            <div>
+              <p class="label">Filters</p>
+              <p class="muted">Collapse to maximize card space</p>
             </div>
+            <button class="ghost filter-toggle" id="toggle-filters" aria-expanded="true">Hide Filters</button>
+          </div>
+          <div class="filters" id="filter-controls">
+            <label class="field inline">
+              <span>Search</span>
+              <input type="text" id="card-search" placeholder="Name, school, text" />
+            </label>
+            <select id="school-filter" class="select">
+              <option value="">All Schools</option>
+              <option value="Blood">Blood</option>
+              <option value="Shadow">Shadow</option>
+              <option value="Flame">Flame</option>
+              <option value="Grave">Grave</option>
+              <option value="Hex">Hex</option>
+            </select>
+          </div>
+        </section>
 
-            <aside class="deck-panel">
-              <div class="panel-head">
-                <div>
-                  <p class="label">Deck list</p>
-                  <p class="muted">Tap a card to remove</p>
-                </div>
-                <button class="ghost" id="clear-deck">Clear</button>
+        <div class="deck-layout">
+          <aside class="deck-panel">
+            <div class="panel-head">
+              <div>
+                <p class="label">Deck list</p>
+                <p class="muted">Tap a card to remove</p>
               </div>
-              <ul class="deck-list" id="deck-list"></ul>
-            </aside>
+              <button class="ghost" id="clear-deck">Clear</button>
+            </div>
+            <ul class="deck-list" id="deck-list"></ul>
+          </aside>
+
+          <div class="card-browser">
+            <div class="browser-head">
+              <div>
+                <p class="label">All cards</p>
+                <p class="muted">Swipe to browse, hold to inspect, tap add</p>
+              </div>
+            </div>
+            <div class="card-grid" id="card-grid"></div>
           </div>
         </div>
         <div class="status" id="deck-status" role="status" aria-live="polite"></div>

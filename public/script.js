@@ -20,6 +20,9 @@ const backToMenuButton = document.getElementById('back-to-menu');
 const cardGrid = document.getElementById('card-grid');
 const cardSearch = document.getElementById('card-search');
 const schoolFilter = document.getElementById('school-filter');
+const filterPanel = document.getElementById('filter-panel');
+const filterControls = document.getElementById('filter-controls');
+const toggleFiltersButton = document.getElementById('toggle-filters');
 const deckList = document.getElementById('deck-list');
 const deckNameInput = document.getElementById('deck-name');
 const deckCount = document.getElementById('deck-count');
@@ -225,6 +228,18 @@ function applyFilters() {
     return matchesSchool && matchesQuery;
   });
   renderCardGrid(filtered);
+}
+
+function toggleFilters() {
+  if (!filterPanel || !filterControls || !toggleFiltersButton) return;
+  const collapsed = filterPanel.classList.toggle('collapsed');
+  if (collapsed) {
+    filterControls.setAttribute('hidden', 'true');
+  } else {
+    filterControls.removeAttribute('hidden');
+  }
+  toggleFiltersButton.textContent = collapsed ? 'Show Filters' : 'Hide Filters';
+  toggleFiltersButton.setAttribute('aria-expanded', String(!collapsed));
 }
 
 function updateDeckCount() {
@@ -437,6 +452,7 @@ saveDeckButton.addEventListener('click', saveDeck);
 
 cardSearch.addEventListener('input', applyFilters);
 schoolFilter.addEventListener('change', applyFilters);
+toggleFiltersButton.addEventListener('click', toggleFilters);
 
 closeModalButton.addEventListener('click', hideCardModal);
 modalBackdrop.addEventListener('click', hideCardModal);

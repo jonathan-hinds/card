@@ -4,6 +4,7 @@ const express = require('express');
 const { MongoClient } = require('mongodb');
 
 const mongoConfig = require('./config/mongo-config');
+const { cards } = require('./config/card-definitions');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +12,12 @@ const MONGO_URI = process.env.MONGO_URI || mongoConfig.mongoUri;
 const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
 
 let usersCollection;
+let cardsCollection;
+let decksCollection;
+let database;
+
+const MAX_DECK_SIZE = 20;
+const MAX_COPIES_PER_CARD = 3;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -41,18 +48,69 @@ function verifyToken(token) {
   }
 }
 
+function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace('Bearer ', '');
+  const payload = verifyToken(token);
+
+  if (!payload) {
+    return res.status(401).json({ message: 'Invalid token.' });
+  }
+
+  req.user = payload;
+  next();
+}
+
+async function seedCards() {
+  const bulkOps = cards.map((card) => ({
+    updateOne: {
+      filter: { slug: card.slug },
+      update: { $set: { ...card, updatedAt: new Date() } },
+      upsert: true,
+    },
+  }));
+
+  if (bulkOps.length > 0) {
+    await cardsCollection.bulkWrite(bulkOps, { ordered: false });
+  }
+}
+
 async function ensureDatabase() {
-  if (usersCollection) return usersCollection;
+  if (database) return database;
   const client = new MongoClient(MONGO_URI);
   await client.connect();
-  const db = client.db('gothic-arcade');
-  usersCollection = db.collection('players');
-  await usersCollection.createIndex({ username: 1 }, { unique: true });
-  return usersCollection;
+  database = client.db('gothic-arcade');
+  usersCollection = database.collection('players');
+  cardsCollection = database.collection('cards');
+  decksCollection = database.collection('decks');
+
+  await Promise.all([
+    usersCollection.createIndex({ username: 1 }, { unique: true }),
+    cardsCollection.createIndex({ slug: 1 }, { unique: true }),
+    decksCollection.createIndex({ owner: 1, name: 1 }, { unique: true }),
+  ]);
+
+  await seedCards();
+
+  return database;
 }
 
 app.get('/health', (_, res) => {
   res.json({ status: 'ok' });
+});
+
+app.get('/api/cards', async (_, res) => {
+  try {
+    await ensureDatabase();
+    const cardList = await cardsCollection
+      .find({}, { projection: { _id: 0 } })
+      .sort({ school: 1, name: 1 })
+      .toArray();
+    res.json({ cards: cardList });
+  } catch (error) {
+    console.error('Cards load error:', error);
+    res.status(500).json({ message: 'Failed to load cards.' });
+  }
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -62,7 +120,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    const collection = await ensureDatabase();
+    await ensureDatabase();
     const salt = crypto.randomBytes(16);
     const passwordHash = crypto.scryptSync(password, salt, 64).toString('hex');
     const user = {
@@ -72,7 +130,7 @@ app.post('/api/auth/register', async (req, res) => {
       createdAt: new Date(),
     };
 
-    await collection.insertOne(user);
+    await usersCollection.insertOne(user);
     const token = createToken({ username: user.username, createdAt: Date.now() });
     res.status(201).json({ message: 'Account created successfully.', token, username: user.username });
   } catch (error) {
@@ -91,8 +149,8 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   try {
-    const collection = await ensureDatabase();
-    const player = await collection.findOne({ username: username.toLowerCase() });
+    await ensureDatabase();
+    const player = await usersCollection.findOne({ username: username.toLowerCase() });
     if (!player) {
       return res.status(401).json({ message: 'Username not found.' });
     }
@@ -111,17 +169,99 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/profile', async (req, res) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.replace('Bearer ', '');
-  const payload = verifyToken(token);
-  if (!payload) {
-    return res.status(401).json({ message: 'Invalid token.' });
+app.get('/api/decks', authenticate, async (req, res) => {
+  try {
+    await ensureDatabase();
+    const decks = await decksCollection
+      .find({ owner: req.user.username }, { projection: { _id: 0, owner: 0 } })
+      .sort({ updatedAt: -1 })
+      .toArray();
+    res.json({ decks });
+  } catch (error) {
+    console.error('Deck load error:', error);
+    res.status(500).json({ message: 'Failed to load decks.' });
+  }
+});
+
+app.post('/api/decks', authenticate, async (req, res) => {
+  const { name, cards: deckCards } = req.body || {};
+
+  if (!name || typeof name !== 'string') {
+    return res.status(400).json({ message: 'Deck name is required.' });
+  }
+
+  if (!Array.isArray(deckCards)) {
+    return res.status(400).json({ message: 'Deck list must be an array.' });
+  }
+
+  const normalizedCards = deckCards.map((entry) => ({
+    slug: entry.slug,
+    quantity: Number(entry.quantity) || 0,
+  }));
+
+  const totalCards = normalizedCards.reduce((sum, card) => sum + card.quantity, 0);
+
+  if (totalCards !== MAX_DECK_SIZE) {
+    return res
+      .status(400)
+      .json({ message: `Deck must contain exactly ${MAX_DECK_SIZE} cards. Currently at ${totalCards}.` });
+  }
+
+  const invalidQuantity = normalizedCards.find(
+    (card) => !card.slug || card.quantity < 1 || card.quantity > MAX_COPIES_PER_CARD,
+  );
+
+  if (invalidQuantity) {
+    return res
+      .status(400)
+      .json({ message: `Each card must appear between 1 and ${MAX_COPIES_PER_CARD} times.` });
   }
 
   try {
-    const collection = await ensureDatabase();
-    const player = await collection.findOne({ username: payload.username }, { projection: { passwordHash: 0, salt: 0 } });
+    await ensureDatabase();
+
+    const uniqueSlugs = [...new Set(normalizedCards.map((card) => card.slug))];
+    const existing = await cardsCollection
+      .find({ slug: { $in: uniqueSlugs } }, { projection: { slug: 1 } })
+      .toArray();
+
+    if (existing.length !== uniqueSlugs.length) {
+      return res.status(400).json({ message: 'Deck contains unknown cards.' });
+    }
+
+    const now = new Date();
+    const sanitizedName = name.trim().slice(0, 60);
+
+    const deckResult = await decksCollection.findOneAndUpdate(
+      { owner: req.user.username, name: sanitizedName },
+      {
+        $set: {
+          cards: normalizedCards,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          owner: req.user.username,
+          createdAt: now,
+        },
+      },
+      { upsert: true, returnDocument: 'after', projection: { _id: 0, owner: 0 } },
+    );
+
+    res.status(201).json({ message: 'Deck saved.', deck: deckResult.value });
+  } catch (error) {
+    console.error('Deck save error:', error);
+    res.status(500).json({ message: 'Failed to save deck.' });
+  }
+});
+
+app.get('/api/profile', authenticate, async (req, res) => {
+  try {
+    await ensureDatabase();
+    const player = await usersCollection.findOne(
+      { username: req.user.username },
+      { projection: { passwordHash: 0, salt: 0 } },
+    );
+
     if (!player) {
       return res.status(404).json({ message: 'Player not found.' });
     }

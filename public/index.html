@@ -15,13 +15,13 @@
   <body>
     <div class="noise"></div>
     <header class="masthead">
-      <p class="tag">Player Access</p>
+      <p class="tag">Black &amp; White Prototype</p>
       <h1>BLACK GATE</h1>
-      <p class="hint">Enter the dueling ground. Black and white, no frills.</p>
+      <p class="hint">Log in, reach the main menu, and forge your first deck.</p>
     </header>
 
-    <main class="console">
-      <section class="auth-block">
+    <main class="console" id="app-shell">
+      <section class="panel auth" id="auth-panel">
         <div class="tab-row" role="tablist">
           <button class="tab active" data-target="register" aria-selected="true" role="tab">Register</button>
           <button class="tab" data-target="login" aria-selected="false" role="tab">Login</button>
@@ -54,11 +54,83 @@
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </section>
 
-      <section class="profile-block" id="profile-card" hidden>
-        <p class="label">Current session</p>
-        <p class="value" id="profile-name">—</p>
-        <p class="muted" id="profile-meta"></p>
-        <button class="ghost" id="logout">Logout</button>
+      <section class="panel main-menu hidden" id="main-menu">
+        <header class="panel-head">
+          <div>
+            <p class="label">Logged in as</p>
+            <p class="value" id="profile-name">—</p>
+          </div>
+          <button class="ghost" id="logout">Logout</button>
+        </header>
+        <p class="muted" id="profile-meta">Ready for the next duel</p>
+        <div class="menu-grid">
+          <button class="menu-card" data-nav="deck">
+            <p class="menu-title">Deck</p>
+            <p class="menu-sub">Build and save your first arsenal</p>
+          </button>
+          <div class="menu-card disabled">
+            <p class="menu-title">Duel</p>
+            <p class="menu-sub">Coming soon</p>
+          </div>
+          <div class="menu-card disabled">
+            <p class="menu-title">Codex</p>
+            <p class="menu-sub">Lore and systems (soon)</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel deck-builder hidden" id="deck-builder">
+        <header class="panel-head">
+          <div class="deck-meta">
+            <button class="ghost" id="back-to-menu">&larr; Menu</button>
+            <div>
+              <p class="label">Deck name</p>
+              <input id="deck-name" class="deck-name" value="First Steps" />
+            </div>
+          </div>
+          <div class="deck-actions">
+            <div class="pill" id="deck-count">0 / 20</div>
+            <button class="cta" id="save-deck">Save Deck</button>
+          </div>
+        </header>
+
+        <div class="deck-layout">
+          <div class="card-browser">
+            <div class="browser-head">
+              <div>
+                <p class="label">All cards</p>
+                <p class="muted">Browse the full glossary and tap to add</p>
+              </div>
+              <div class="filters">
+                <label class="field inline">
+                  <span>Search</span>
+                  <input type="text" id="card-search" placeholder="Name, school, text" />
+                </label>
+                <select id="school-filter" class="select">
+                  <option value="">All Schools</option>
+                  <option value="Blood">Blood</option>
+                  <option value="Shadow">Shadow</option>
+                  <option value="Flame">Flame</option>
+                  <option value="Grave">Grave</option>
+                  <option value="Hex">Hex</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-grid" id="card-grid"></div>
+          </div>
+
+          <aside class="deck-panel">
+            <div class="panel-head">
+              <div>
+                <p class="label">Deck list</p>
+                <p class="muted">Tap a card to remove</p>
+              </div>
+              <button class="ghost" id="clear-deck">Clear</button>
+            </div>
+            <ul class="deck-list" id="deck-list"></ul>
+          </aside>
+        </div>
+        <div class="status" id="deck-status" role="status" aria-live="polite"></div>
       </section>
     </main>
 

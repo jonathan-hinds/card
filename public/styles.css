@@ -56,7 +56,6 @@ body {
 }
 
 .panel {
-  border: 1px solid var(--border);
   background: #050505;
   padding: 18px;
   display: grid;
@@ -296,7 +295,6 @@ body {
 }
 
 .filter-rail {
-  border: 1px solid var(--border);
   background: #050505;
   padding: 12px;
   display: grid;
@@ -340,20 +338,22 @@ body {
 
 .deck-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  grid-auto-rows: 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .card-browser,
 .deck-panel {
-  border: 1px solid var(--border);
   background: #050505;
-  padding: 14px;
+  padding: 16px;
   display: grid;
+  grid-template-rows: 1fr;
   gap: 12px;
-  min-height: 460px;
-  overflow: auto;
+  min-height: 520px;
+  max-height: clamp(480px, 72vh, 820px);
+  overflow: hidden;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
@@ -361,9 +361,12 @@ body {
   position: sticky;
   top: 12px;
   align-self: start;
+  grid-template-rows: auto 1fr;
 }
 
 .card-grid {
+  overflow: auto;
+  align-content: start;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   grid-auto-rows: 1fr;
@@ -481,6 +484,12 @@ body {
   align-self: start;
 }
 
+.deck-scroll {
+  overflow: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
 .deck-list {
   list-style: none;
   padding: 0;
@@ -490,8 +499,8 @@ body {
 }
 
 .deck-item {
-  border: 1px solid var(--fg);
-  background: #050505;
+  background: #0a0a0a;
+  box-shadow: inset 0 0 0 1px var(--border);
   padding: 10px 12px;
   display: flex;
   justify-content: space-between;
@@ -539,18 +548,20 @@ code {
 
   .deck-panel,
   .card-browser {
-    min-height: auto;
+    min-height: 380px;
+    max-height: 70vh;
   }
 
   .deck-panel {
     position: static;
-    max-height: none;
+    max-height: 60vh;
     order: 1;
-    box-shadow: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
   .card-browser {
     order: 2;
+    max-height: 72vh;
   }
 
   .card-grid {

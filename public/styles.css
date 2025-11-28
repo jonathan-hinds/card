@@ -534,107 +534,6 @@ body {
   z-index: 1;
 }
 
-.duel-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 12px;
-}
-
-.section {
-  background: #0a0a0a;
-  border: 1px solid var(--border);
-}
-
-.player-rows {
-  display: grid;
-  gap: 10px;
-}
-
-.player-card {
-  border: 1px solid var(--border);
-  padding: 10px;
-  background: #050505;
-}
-
-.player-card .label {
-  font-size: 13px;
-}
-
-.resource-bar {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 6px 0;
-}
-
-.resource-bar .pill {
-  justify-content: center;
-  text-align: center;
-}
-
-.zone-line {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 12px;
-  margin: 4px 0;
-}
-
-.phase-banner {
-  border: 1px solid var(--border);
-  padding: 8px 10px;
-  margin: 6px 0 10px;
-  background: #070707;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.hand-row,
-.void-row {
-  border: 1px solid var(--border);
-  padding: 8px 10px;
-  margin-bottom: 10px;
-}
-
-.hand-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-}
-
-.mini-card {
-  border: 1px solid var(--border);
-  padding: 8px;
-  background: #050505;
-  cursor: pointer;
-}
-
-.mini-card h4 {
-  margin: 0 0 6px;
-  font-size: 14px;
-}
-
-.mini-card p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.log {
-  border: 1px solid var(--border);
-  padding: 10px;
-  max-height: 220px;
-  overflow-y: auto;
-  background: #050505;
-}
-
-.log-entry {
-  margin: 0 0 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 code {
   background: #000;
   padding: 2px 4px;
@@ -645,14 +544,6 @@ code {
   .deck-layout {
     display: flex;
     flex-direction: column;
-  }
-
-  .duel-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hand-grid {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 
   .deck-panel,

@@ -6,34 +6,16 @@ const registerForm = document.getElementById('register-form');
 const loginForm = document.getElementById('login-form');
 const statusBox = document.getElementById('status');
 const deckStatusBox = document.getElementById('deck-status');
-const duelStatusBox = document.getElementById('duel-status');
 
 const authPanel = document.getElementById('auth-panel');
 const mainMenu = document.getElementById('main-menu');
 const deckBuilder = document.getElementById('deck-builder');
-const duelPanel = document.getElementById('duel-panel');
 
 const profileName = document.getElementById('profile-name');
 const profileMeta = document.getElementById('profile-meta');
 const logoutButton = document.getElementById('logout');
 const deckNavButton = document.querySelector('[data-nav="deck"]');
-const duelNavButton = document.querySelector('[data-nav="duel"]');
 const backToMenuButton = document.getElementById('back-to-menu');
-const duelBackButton = document.getElementById('duel-back');
-
-const duelPhasePill = document.getElementById('duel-phase');
-const duelPhaseLabel = document.getElementById('phase-label');
-const duelTurnLabel = document.getElementById('turn-label');
-const startDuelButton = document.getElementById('start-duel');
-const advancePhaseButton = document.getElementById('advance-phase');
-const resetDuelButton = document.getElementById('reset-duel');
-const duelPlayerName = document.getElementById('duel-player-name');
-const duelOpponentName = document.getElementById('duel-opponent-name');
-const duelTable = document.getElementById('duel-table');
-const playerRows = document.getElementById('player-rows');
-const handGrid = document.getElementById('hand-grid');
-const voidGrid = document.getElementById('void-grid');
-const duelLog = document.getElementById('duel-log');
 
 const cardGrid = document.getElementById('card-grid');
 const cardSearch = document.getElementById('card-search');
@@ -59,7 +41,6 @@ let deckState = new Map();
 let cardsLoaded = false;
 let decksLoaded = false;
 let activeSchool = '';
-let duelEngine = null;
 
 function showStatus(message, variant = 'success', target = statusBox) {
   if (!target) return;
@@ -77,7 +58,6 @@ function showScreen(view) {
   authPanel.classList.toggle('hidden', view !== 'auth');
   mainMenu.classList.toggle('hidden', view !== 'menu');
   deckBuilder.classList.toggle('hidden', view !== 'deck');
-  duelPanel.classList.toggle('hidden', view !== 'duel');
 }
 
 function renderProfile(username) {
@@ -102,7 +82,6 @@ function clearSession() {
   deckState.clear();
   cardsLoaded = false;
   decksLoaded = false;
-  duelEngine = null;
   showScreen('auth');
 }
 
@@ -289,177 +268,6 @@ function renderDeckList() {
   updateDeckCount();
 }
 
-function buildDeckArray() {
-  const slots = Array.from(deckState.values());
-  const total = slots.reduce((sum, entry) => sum + entry.quantity, 0);
-  if (total !== MAX_DECK_SIZE) {
-    throw new Error(`Deck must be ${MAX_DECK_SIZE} cards before dueling.`);
-  }
-  const slugs = [];
-  slots.forEach((entry) => {
-    for (let i = 0; i < entry.quantity; i += 1) {
-      slugs.push(entry.card.slug);
-    }
-  });
-  return slugs;
-}
-
-function renderPlayerCard(player, isActive) {
-  const card = document.createElement('div');
-  card.className = 'player-card';
-
-  const name = document.createElement('p');
-  name.className = 'label';
-  name.textContent = `${player.name}${isActive ? ' • ACTIVE' : ''}`;
-
-  const resources = document.createElement('div');
-  resources.className = 'resource-bar';
-  const vit = document.createElement('div');
-  vit.className = 'pill';
-  vit.textContent = `Vitality ${player.vitality}`;
-  const will = document.createElement('div');
-  will.className = 'pill';
-  will.textContent = `Will ${player.will}`;
-  const soul = document.createElement('div');
-  soul.className = 'pill';
-  soul.textContent = `Soulfire ${player.currentSoulfire}/${player.maxSoulfire}`;
-  resources.append(vit, will, soul);
-
-  const status = document.createElement('p');
-  status.className = 'muted';
-  status.textContent = `Ward ${player.ward?.amount ?? 0} • Burn ${player.burn.reduce((s, b) => s + b.value, 0)} • Channel ${player.pendingChannel}`;
-
-  const zones = document.createElement('div');
-  zones.className = 'zone-line';
-  zones.textContent = `Hand ${player.hand.length} • Deck ${player.deck.length} • Discard ${player.discard.length} • Void ${player.void.length}`;
-
-  card.append(name, resources, status, zones);
-  return card;
-}
-
-function renderHand(player) {
-  handGrid.innerHTML = '';
-  player.hand.forEach((instance) => {
-    const cost = duelEngine ? duelEngine.computeCost(player, instance.card) : instance.card.cost?.soulfire ?? 0;
-    const tile = document.createElement('div');
-    tile.className = 'mini-card';
-    const title = document.createElement('h4');
-    title.textContent = `${instance.card.name} (Cost ${cost})`;
-    const meta = document.createElement('p');
-    meta.textContent = `${instance.card.school} • ${instance.card.cardType}`;
-    const text = document.createElement('p');
-    text.textContent = instance.card.rulesText;
-    tile.append(title, meta, text);
-    tile.addEventListener('click', () => playFromHand(instance));
-    handGrid.appendChild(tile);
-  });
-}
-
-function renderVoid(player) {
-  voidGrid.innerHTML = '';
-  player.void
-    .filter((c) => c.card.effects.some((effect) => effect.effectType === 'HAUNT'))
-    .forEach((instance) => {
-      const tile = document.createElement('div');
-      tile.className = 'mini-card';
-      const title = document.createElement('h4');
-      title.textContent = `${instance.card.name} (Haunt)`;
-      const text = document.createElement('p');
-      text.textContent = instance.card.rulesText;
-      tile.append(title, text);
-      tile.addEventListener('click', () => useHaunt(instance));
-      voidGrid.appendChild(tile);
-    });
-}
-
-function renderLog() {
-  duelLog.innerHTML = '';
-  if (!duelEngine) return;
-  duelEngine.logs.slice(0, 30).forEach((entry) => {
-    const p = document.createElement('p');
-    p.className = 'log-entry';
-    p.textContent = `T${entry.turn} [${entry.phase}] ${entry.entry}`;
-    duelLog.appendChild(p);
-  });
-}
-
-function renderDuel() {
-  if (!duelEngine) return;
-  duelTable.classList.remove('hidden');
-  playerRows.innerHTML = '';
-  duelEngine.players.forEach((player, index) => {
-    playerRows.appendChild(renderPlayerCard(player, index === duelEngine.activeIndex));
-  });
-  duelPhasePill.textContent = duelEngine.phase.toUpperCase();
-  duelPhaseLabel.textContent = duelEngine.phase.toUpperCase();
-  duelTurnLabel.textContent = `Turn ${duelEngine.turn}`;
-  renderHand(duelEngine.activePlayer);
-  renderVoid(duelEngine.activePlayer);
-  renderLog();
-}
-
-function useHaunt(instance) {
-  if (!duelEngine) return;
-  try {
-    duelEngine.activateHaunt(instance.id);
-    showStatus(`${duelEngine.activePlayer.name} haunts with ${instance.card.name}.`, 'success', duelStatusBox);
-    renderDuel();
-  } catch (error) {
-    showStatus(error.message, 'error', duelStatusBox);
-  }
-}
-
-function playFromHand(instance) {
-  if (!duelEngine) return;
-  const ritualOption = instance.card.effects.some((e) => e.effectType === 'RITUAL_MODE');
-  const useRitual = ritualOption ? window.confirm('Use Ritual mode if available?') : false;
-  try {
-    duelEngine.playCard(instance.id, { useRitual });
-    showStatus(`${duelEngine.activePlayer.name} resolves ${instance.card.name}.`, 'success', duelStatusBox);
-    renderDuel();
-  } catch (error) {
-    showStatus(error.message, 'error', duelStatusBox);
-  }
-}
-
-function hydrateNames() {
-  duelPlayerName.value = activeUser || 'You';
-  duelOpponentName.value = 'Rival';
-}
-
-function startDuel() {
-  try {
-    const deckArray = buildDeckArray();
-    duelEngine = new window.DuelEngine(cardPool, [
-      { name: duelPlayerName.value || 'You', deck: deckArray },
-      { name: duelOpponentName.value || 'Rival', deck: deckArray },
-    ]);
-    duelEngine.startGame();
-    showStatus('Duel created. Follow the phase banner and play from your hand.', 'success', duelStatusBox);
-    renderDuel();
-  } catch (error) {
-    showStatus(error.message, 'error', duelStatusBox);
-  }
-}
-
-function advancePhase() {
-  if (!duelEngine) {
-    showStatus('Start a duel first.', 'error', duelStatusBox);
-    return;
-  }
-  duelEngine.nextPhase();
-  renderDuel();
-}
-
-function resetDuel() {
-  duelEngine = null;
-  duelTable.classList.add('hidden');
-  duelLog.innerHTML = '';
-  handGrid.innerHTML = '';
-  voidGrid.innerHTML = '';
-  showStatus('Duel reset.', 'success', duelStatusBox);
-}
-
 function addToDeck(card) {
   const total = updateDeckCount();
   if (total >= MAX_DECK_SIZE) {
@@ -619,34 +427,13 @@ deckNavButton.addEventListener('click', async () => {
   applyFilters();
 });
 
-duelNavButton.addEventListener('click', async () => {
-  if (!activeToken) {
-    showStatus('Log in to start a duel.', 'error');
-    return;
-  }
-  showScreen('duel');
-  await loadCards();
-  await loadDecks();
-  hydrateNames();
-  applyFilters();
-});
-
 backToMenuButton.addEventListener('click', () => {
   showScreen('menu');
   clearStatus(deckStatusBox);
 });
 
-duelBackButton.addEventListener('click', () => {
-  showScreen('menu');
-  clearStatus(duelStatusBox);
-});
-
 clearDeckButton.addEventListener('click', resetDeck);
 saveDeckButton.addEventListener('click', saveDeck);
-
-startDuelButton.addEventListener('click', startDuel);
-advancePhaseButton.addEventListener('click', advancePhase);
-resetDuelButton.addEventListener('click', resetDuel);
 
 cardSearch.addEventListener('input', applyFilters);
 
@@ -682,6 +469,5 @@ tabs.forEach((tab) => {
 });
 
 hydrateProfile();
-hydrateNames();
 applyFilters();
 renderDeckList();

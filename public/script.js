@@ -10,6 +10,36 @@ const deckStatusBox = document.getElementById('deck-status');
 const authPanel = document.getElementById('auth-panel');
 const mainMenu = document.getElementById('main-menu');
 const deckBuilder = document.getElementById('deck-builder');
+const duelHub = document.getElementById('duel-hub');
+const duelTable = document.getElementById('duel-table');
+
+const duelNavButton = document.querySelector('[data-nav="duel"]');
+const duelToMenuButton = document.getElementById('duel-to-menu');
+const duelExitButton = document.getElementById('duel-exit');
+const startLocalDuelButton = document.getElementById('start-local-duel');
+const duelDeckLabel = document.getElementById('duel-deck-label');
+const duelStatusText = document.getElementById('duel-status');
+const queueTypeLocal = document.getElementById('queue-type-local');
+const queueTypeMatch = document.getElementById('queue-type-match');
+const duelPhase = document.getElementById('duel-phase');
+const turnIndicator = document.getElementById('turn-indicator');
+const advancePhaseButton = document.getElementById('advance-phase');
+const endTurnButton = document.getElementById('end-turn');
+const drawCardButton = document.getElementById('draw-card');
+
+const playerNameLabel = document.getElementById('player-name');
+const opponentNameLabel = document.getElementById('opponent-name');
+const playerStatusText = document.getElementById('player-status');
+const opponentStatusText = document.getElementById('opponent-status');
+const playerStats = document.getElementById('player-stats');
+const opponentStats = document.getElementById('opponent-stats');
+const playerPiles = document.getElementById('player-piles');
+const opponentPiles = document.getElementById('opponent-piles');
+const phaseTrack = document.getElementById('phase-track');
+const duelLogBox = document.getElementById('duel-log');
+const handGrid = document.getElementById('hand-grid');
+
+const PHASES = ['Start', 'Draw', 'Main', 'End'];
 
 const profileName = document.getElementById('profile-name');
 const profileMeta = document.getElementById('profile-meta');
@@ -41,6 +71,8 @@ let deckState = new Map();
 let cardsLoaded = false;
 let decksLoaded = false;
 let activeSchool = '';
+let duelEngine = null;
+let duelMode = 'local';
 
 function showStatus(message, variant = 'success', target = statusBox) {
   if (!target) return;
@@ -55,9 +87,18 @@ function clearStatus(target = statusBox) {
 }
 
 function showScreen(view) {
-  authPanel.classList.toggle('hidden', view !== 'auth');
-  mainMenu.classList.toggle('hidden', view !== 'menu');
-  deckBuilder.classList.toggle('hidden', view !== 'deck');
+  const views = {
+    auth: authPanel,
+    menu: mainMenu,
+    deck: deckBuilder,
+    duel: duelHub,
+    table: duelTable,
+  };
+
+  Object.entries(views).forEach(([key, element]) => {
+    if (!element) return;
+    element.classList.toggle('hidden', view !== key);
+  });
 }
 
 function renderProfile(username) {
@@ -376,6 +417,410 @@ function resetDeck() {
   clearStatus(deckStatusBox);
 }
 
+class DuelEngine {
+  constructor(pool = []) {
+    this.cardPool = pool;
+    this.players = [];
+    this.state = {
+      activePlayer: 0,
+      turn: 1,
+      phaseIndex: 0,
+      logs: [],
+    };
+  }
+
+  log(message) {
+    this.state.logs.unshift({ message, at: new Date().toISOString() });
+  }
+
+  shuffle(cards) {
+    const arr = [...cards];
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  createPlayer(config, isFirst) {
+    const deck = this.shuffle(config.deck || []);
+    return {
+      name: config.name || 'Player',
+      vitality: 20,
+      will: 10,
+      maxSoulfire: 3,
+      currentSoulfire: 3,
+      deck,
+      hand: [],
+      discard: [],
+      void: [],
+      inPlay: [],
+      hasReshuffled: false,
+      drewAfterReshuffleThisTurn: false,
+      skipNextDraw: isFirst,
+    };
+  }
+
+  start({ players }) {
+    this.players = players.map((player, index) => this.createPlayer(player, index === 0));
+    this.state = { activePlayer: 0, turn: 1, phaseIndex: 0, logs: [] };
+
+    this.drawCards(0, 5);
+    this.drawCards(1, 6);
+    this.log('Duel initialized. First player skips their first draw.');
+    this.setPhase('Start');
+    return this.snapshot();
+  }
+
+  snapshot() {
+    return {
+      ...this.state,
+      phase: PHASES[this.state.phaseIndex],
+      players: this.players.map((player) => ({
+        ...player,
+        hand: [...player.hand],
+        deck: [...player.deck],
+        discard: [...player.discard],
+        void: [...player.void],
+        inPlay: [...player.inPlay],
+      })),
+    };
+  }
+
+  setPhase(phaseName) {
+    const index = PHASES.indexOf(phaseName);
+    this.state.phaseIndex = Math.max(0, index);
+    this.state.phase = phaseName;
+    if (phaseName === 'Start') {
+      this.runStartPhase();
+    } else if (phaseName === 'Draw') {
+      this.runDrawPhase();
+    } else if (phaseName === 'End') {
+      this.runEndPhase();
+    }
+  }
+
+  advancePhase() {
+    if (PHASES[this.state.phaseIndex] === 'End') {
+      return this.endTurn();
+    }
+    const nextIndex = (this.state.phaseIndex + 1) % PHASES.length;
+    this.setPhase(PHASES[nextIndex]);
+    return this.snapshot();
+  }
+
+  endTurn() {
+    if (this.state.phase !== 'End') {
+      this.runEndPhase();
+    }
+    this.state.activePlayer = this.state.activePlayer === 0 ? 1 : 0;
+    this.state.turn += 1;
+    this.state.phaseIndex = 0;
+    this.players[this.state.activePlayer].drewAfterReshuffleThisTurn = false;
+    this.setPhase('Start');
+    return this.snapshot();
+  }
+
+  runStartPhase() {
+    const player = this.players[this.state.activePlayer];
+    player.maxSoulfire = Math.min(10, player.maxSoulfire + 1);
+    player.currentSoulfire = player.maxSoulfire;
+    this.log(`${player.name} refreshes to ${player.currentSoulfire} Soulfire.`);
+  }
+
+  runDrawPhase() {
+    const player = this.players[this.state.activePlayer];
+    if (player.skipNextDraw) {
+      this.log(`${player.name} skips the first draw of the game.`);
+      player.skipNextDraw = false;
+      return;
+    }
+    this.drawCards(this.state.activePlayer, 1);
+  }
+
+  runEndPhase() {
+    const player = this.players[this.state.activePlayer];
+    if (player.hand.length > 7) {
+      const extra = player.hand.splice(7);
+      player.discard.push(...extra);
+      this.log(`${player.name} discards ${extra.length} down to 7 cards.`);
+    }
+
+    if (player.hasReshuffled && player.drewAfterReshuffleThisTurn) {
+      player.will = Math.max(0, player.will - 1);
+      this.log(`${player.name} loses 1 Will after drawing post-reshuffle.`);
+    }
+    player.drewAfterReshuffleThisTurn = false;
+  }
+
+  drawCards(playerIndex, count) {
+    for (let i = 0; i < count; i += 1) {
+      this.drawCard(playerIndex);
+    }
+    return this.snapshot();
+  }
+
+  drawCard(playerIndex) {
+    const player = this.players[playerIndex];
+    if (!player) return null;
+
+    if (player.deck.length === 0) {
+      this.reshuffle(player);
+    }
+
+    const card = player.deck.shift();
+    if (card) {
+      player.hand.push(card);
+      if (player.hasReshuffled) {
+        player.drewAfterReshuffleThisTurn = true;
+      }
+      this.log(`${player.name} draws ${card.name}.`);
+      return card;
+    }
+    this.log(`${player.name} could not draw a card.`);
+    return null;
+  }
+
+  reshuffle(player) {
+    const pool = [...player.discard, ...player.void, ...player.inPlay];
+    player.discard = [];
+    player.void = [];
+    player.inPlay = [];
+    player.deck = this.shuffle(pool);
+    player.hasReshuffled = true;
+    this.log(`${player.name} reshuffles their discard, void, and ongoing cards.`);
+  }
+
+  playFromHand(playerIndex, handIndex) {
+    const player = this.players[playerIndex];
+    if (!player || playerIndex !== this.state.activePlayer) {
+      this.log('Not your turn.');
+      return this.snapshot();
+    }
+    const card = player.hand[handIndex];
+    if (!card) return this.snapshot();
+
+    const cost = card.cost?.soulfire ?? 0;
+    if (player.currentSoulfire < cost) {
+      this.log(`Not enough Soulfire to play ${card.name}.`);
+      return this.snapshot();
+    }
+
+    player.currentSoulfire -= cost;
+    player.hand.splice(handIndex, 1);
+
+    if (card.cardType === 'Hex') {
+      player.inPlay.push(card);
+    } else {
+      player.discard.push(card);
+    }
+
+    if (Array.isArray(card.effects) && card.effects.length) {
+      this.log(`${player.name} plays ${card.name} (${card.cardType}) and resolves its effects.`);
+    } else {
+      this.log(`${player.name} plays ${card.name} (${card.cardType}).`);
+    }
+
+    return this.snapshot();
+  }
+}
+
+function ensureDeckLabel() {
+  const total = updateDeckCount();
+  duelDeckLabel.textContent = total ? `${total}/20 cards ready` : 'No deck saved. Using demo list.';
+}
+
+function buildDeckForDuel() {
+  const deck = [];
+  deckState.forEach((entry) => {
+    for (let i = 0; i < entry.quantity; i += 1) {
+      deck.push({ ...entry.card });
+    }
+  });
+
+  if (deck.length < MAX_DECK_SIZE) {
+    const filler = cardPool.slice(0, MAX_DECK_SIZE - deck.length);
+    deck.push(...filler.map((card) => ({ ...card })));
+  }
+
+  return deck.slice(0, MAX_DECK_SIZE);
+}
+
+function buildAIDeck() {
+  const shuffled = [...cardPool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, MAX_DECK_SIZE).map((card) => ({ ...card }));
+}
+
+function renderStats(container, player, isActive) {
+  if (!container || !player) return;
+  container.innerHTML = '';
+  const stats = [
+    { label: 'Vitality', value: player.vitality },
+    { label: 'Will', value: player.will },
+    { label: 'Soulfire', value: `${player.currentSoulfire}/${player.maxSoulfire}` },
+    { label: 'Hand', value: player.hand.length },
+  ];
+  stats.forEach((stat) => {
+    const box = document.createElement('div');
+    box.className = 'stat';
+    const label = document.createElement('p');
+    label.className = 'label';
+    label.textContent = stat.label;
+    const value = document.createElement('p');
+    value.className = 'value';
+    value.textContent = stat.value;
+    box.append(label, value);
+    if (isActive) {
+      box.style.boxShadow = '0 0 0 1px #fff inset';
+    }
+    container.appendChild(box);
+  });
+}
+
+function renderPiles(container, player, isSelf) {
+  if (!container || !player) return;
+  container.innerHTML = '';
+  const piles = [
+    { key: 'deck', label: 'Deck', value: player.deck.length },
+    { key: 'discard', label: 'Discard', value: player.discard.length },
+    { key: 'void', label: 'Void', value: player.void.length },
+    { key: 'inPlay', label: 'In Play', value: player.inPlay.length },
+    { key: 'hand', label: 'Hand', value: player.hand.length, note: isSelf ? 'Tap below to play' : 'Hidden' },
+  ];
+
+  piles.forEach((pile) => {
+    const box = document.createElement('div');
+    box.className = `pile ${pile.key === 'hand' ? 'small' : ''}`;
+    const label = document.createElement('p');
+    label.className = 'label';
+    label.textContent = pile.label;
+    const value = document.createElement('p');
+    value.className = 'value';
+    value.textContent = pile.value;
+    box.append(label, value);
+    if (pile.note) {
+      const note = document.createElement('p');
+      note.className = 'muted small';
+      note.textContent = pile.note;
+      box.appendChild(note);
+    }
+    if (pile.key === 'inPlay' && player.inPlay.length) {
+      const names = document.createElement('p');
+      names.className = 'muted small';
+      names.textContent = player.inPlay.map((c) => c.name).join(', ');
+      box.appendChild(names);
+    }
+    container.appendChild(box);
+  });
+}
+
+function renderPhaseTrack(activePhase) {
+  if (!phaseTrack) return;
+  phaseTrack.innerHTML = '';
+  PHASES.forEach((phase) => {
+    const chip = document.createElement('div');
+    chip.className = `phase-chip ${phase === activePhase ? 'active' : ''}`;
+    chip.textContent = phase;
+    phaseTrack.appendChild(chip);
+  });
+}
+
+function renderHand(hand) {
+  if (!handGrid) return;
+  handGrid.innerHTML = '';
+  hand.forEach((card, index) => {
+    const tile = document.createElement('div');
+    tile.className = 'hand-card';
+    const title = document.createElement('p');
+    title.className = 'label';
+    title.textContent = card.name;
+    const meta = document.createElement('p');
+    meta.className = 'muted';
+    meta.textContent = `${card.school} • ${card.cardType}`;
+    const rules = document.createElement('p');
+    rules.className = 'muted small';
+    rules.textContent = card.rulesText;
+    const cost = document.createElement('p');
+    cost.className = 'muted small';
+    cost.textContent = `Cost ${card.cost?.soulfire ?? 0} Soulfire`;
+    tile.append(title, meta, rules, cost);
+    tile.addEventListener('click', () => {
+      duelEngine?.playFromHand(0, index);
+      refreshDuelUI();
+    });
+    handGrid.appendChild(tile);
+  });
+}
+
+function renderLog(logs) {
+  if (!duelLogBox) return;
+  duelLogBox.innerHTML = '';
+  logs.forEach((entry) => {
+    const line = document.createElement('p');
+    line.textContent = entry.message;
+    duelLogBox.appendChild(line);
+  });
+}
+
+function refreshDuelUI() {
+  if (!duelEngine) return;
+  const snapshot = duelEngine.snapshot();
+  const [you, foe] = snapshot.players;
+
+  playerNameLabel.textContent = you.name;
+  opponentNameLabel.textContent = foe.name;
+  playerStatusText.textContent = snapshot.activePlayer === 0 ? 'Your turn' : 'Waiting';
+  opponentStatusText.textContent = snapshot.activePlayer === 1 ? 'Their turn' : 'Waiting';
+
+  renderStats(playerStats, you, snapshot.activePlayer === 0);
+  renderStats(opponentStats, foe, snapshot.activePlayer === 1);
+  renderPiles(playerPiles, you, true);
+  renderPiles(opponentPiles, foe, false);
+  renderPhaseTrack(snapshot.phase);
+  renderHand(you.hand);
+  renderLog(snapshot.logs);
+
+  duelPhase.textContent = `${snapshot.phase} Phase`;
+  turnIndicator.textContent = `Turn ${snapshot.turn}`;
+}
+
+async function prepareDuelHub() {
+  await loadCards();
+  await loadDecks();
+  ensureDeckLabel();
+  setQueueMode(duelMode);
+}
+
+function startLocalDuel() {
+  if (!cardPool.length) {
+    showStatus('Cards not loaded yet.', 'error');
+    return;
+  }
+  const playerDeck = buildDeckForDuel();
+  const aiDeck = buildAIDeck();
+  duelEngine = new DuelEngine(cardPool);
+  duelEngine.start({
+    players: [
+      { name: activeUser || 'You', deck: playerDeck },
+      { name: 'Rival Shade', deck: aiDeck },
+    ],
+  });
+  showScreen('table');
+  refreshDuelUI();
+}
+
+function exitDuel() {
+  duelEngine = null;
+  showScreen('menu');
+}
+
+function setQueueMode(mode) {
+  duelMode = mode;
+  queueTypeLocal.classList.toggle('active', mode === 'local');
+  queueTypeMatch.classList.toggle('active', mode === 'match');
+  duelStatusText.textContent = mode === 'local' ? 'Local test ready' : 'Queued (placeholder)';
+}
+
 registerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(registerForm);
@@ -430,6 +875,44 @@ deckNavButton.addEventListener('click', async () => {
 backToMenuButton.addEventListener('click', () => {
   showScreen('menu');
   clearStatus(deckStatusBox);
+});
+
+duelNavButton.addEventListener('click', async () => {
+  await prepareDuelHub();
+  showScreen('duel');
+});
+
+duelToMenuButton.addEventListener('click', () => {
+  showScreen('menu');
+});
+
+duelExitButton.addEventListener('click', exitDuel);
+startLocalDuelButton.addEventListener('click', startLocalDuel);
+queueTypeLocal.addEventListener('click', () => setQueueMode('local'));
+queueTypeMatch.addEventListener('click', () => setQueueMode('match'));
+
+advancePhaseButton.addEventListener('click', () => {
+  if (!duelEngine) return;
+  duelEngine.advancePhase();
+  refreshDuelUI();
+});
+
+endTurnButton.addEventListener('click', () => {
+  if (!duelEngine) return;
+  duelEngine.endTurn();
+  refreshDuelUI();
+});
+
+drawCardButton.addEventListener('click', () => {
+  if (!duelEngine) return;
+  const snapshot = duelEngine.snapshot();
+  if (snapshot.activePlayer !== 0) {
+    duelEngine.log('Wait for your turn to draw.');
+    refreshDuelUI();
+    return;
+  }
+  duelEngine.drawCards(0, 1);
+  refreshDuelUI();
 });
 
 clearDeckButton.addEventListener('click', resetDeck);

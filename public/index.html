@@ -62,10 +62,10 @@
             <p class="menu-title">Deck</p>
             <p class="menu-sub">Build and save your first arsenal</p>
           </button>
-          <div class="menu-card disabled">
+          <button class="menu-card" data-nav="duel">
             <p class="menu-title">Duel</p>
-            <p class="menu-sub">Coming soon</p>
-          </div>
+            <p class="menu-sub">Matchmake and play</p>
+          </button>
           <div class="menu-card disabled">
             <p class="menu-title">Codex</p>
             <p class="menu-sub">Lore and systems (soon)</p>
@@ -124,6 +124,97 @@
           </aside>
         </div>
         <div class="status" id="deck-status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="panel duel-hub hidden" id="duel-hub">
+        <div class="panel-head">
+          <div>
+            <p class="label">Duel matchmaking</p>
+            <p class="muted">Queue up and launch a tabletop-style duel</p>
+          </div>
+          <button class="ghost" id="duel-to-menu">&larr; Menu</button>
+        </div>
+        <div class="duel-hub-grid">
+          <div class="duel-card">
+            <p class="label">Status</p>
+            <p class="muted" id="duel-status">Not queued</p>
+            <div class="chip-row inline-chips">
+              <span class="chip active" id="queue-type-local">Local test</span>
+              <span class="chip" id="queue-type-match">Matchmaking</span>
+            </div>
+            <p class="muted">Pick a mode to start. Local test uses your saved deck.</p>
+            <button class="cta" id="start-local-duel">Start local duel</button>
+          </div>
+          <div class="duel-card">
+            <p class="label">Deck choice</p>
+            <p class="muted">We grab your latest saved deck. If empty, we auto-fill a legal demo list.</p>
+            <div class="pill" id="duel-deck-label">No deck loaded yet</div>
+            <p class="muted small">Keep your phone in portrait for the cleanest layout.</p>
+          </div>
+          <div class="duel-card">
+            <p class="label">Rules reminder</p>
+            <ul class="muted compact">
+              <li>20 Vitality, 10 Will. Lose if either hits 0.</li>
+              <li>Decks are 20 cards. Discard and Void reshuffle when empty.</li>
+              <li>Phases: Start → Draw → Main → End. No instants.</li>
+              <li>Hand cap 7 at end of turn. Will loss after any reshuffle turn with a draw.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel duel-table hidden" id="duel-table">
+        <div class="panel-head duel-header">
+          <div class="title-stack">
+            <p class="label">Live duel</p>
+            <p class="muted" id="duel-phase">Waiting to start</p>
+          </div>
+          <div class="duel-controls">
+            <div class="pill" id="turn-indicator">Turn —</div>
+            <button class="ghost" id="advance-phase">Advance phase</button>
+            <button class="cta" id="end-turn">End turn</button>
+            <button class="ghost" id="duel-exit">Exit duel</button>
+          </div>
+        </div>
+
+        <div class="duel-mat">
+          <div class="duel-player" id="opponent-panel">
+            <div class="duel-player-head">
+              <div>
+                <p class="label" id="opponent-name">Opponent</p>
+                <p class="muted" id="opponent-status">Ready</p>
+              </div>
+              <div class="duel-stats" id="opponent-stats"></div>
+            </div>
+            <div class="pile-grid" id="opponent-piles"></div>
+          </div>
+
+          <div class="duel-center">
+            <p class="label">Phase tracker</p>
+            <div class="phase-track" id="phase-track"></div>
+            <p class="muted">Draw cards, play from hand during Main, then end the turn.</p>
+            <div class="duel-log" id="duel-log" aria-live="polite"></div>
+          </div>
+
+          <div class="duel-player self" id="player-panel">
+            <div class="duel-player-head">
+              <div>
+                <p class="label" id="player-name">You</p>
+                <p class="muted" id="player-status">Waiting</p>
+              </div>
+              <div class="duel-stats" id="player-stats"></div>
+            </div>
+            <div class="pile-grid" id="player-piles"></div>
+          </div>
+        </div>
+
+        <div class="duel-hand">
+          <div class="panel-head">
+            <p class="label">Your hand</p>
+            <button class="ghost tiny" id="draw-card">Draw</button>
+          </div>
+          <div class="hand-grid" id="hand-grid"></div>
+        </div>
       </section>
     </main>
 

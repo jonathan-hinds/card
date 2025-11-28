@@ -62,10 +62,10 @@
             <p class="menu-title">Deck</p>
             <p class="menu-sub">Build and save your first arsenal</p>
           </button>
-          <div class="menu-card disabled">
+          <button class="menu-card" data-nav="duel">
             <p class="menu-title">Duel</p>
-            <p class="menu-sub">Coming soon</p>
-          </div>
+            <p class="menu-sub">Match, queue, or hotseat</p>
+          </button>
           <div class="menu-card disabled">
             <p class="menu-title">Codex</p>
             <p class="menu-sub">Lore and systems (soon)</p>
@@ -125,6 +125,74 @@
         </div>
         <div class="status" id="deck-status" role="status" aria-live="polite"></div>
       </section>
+
+      <section class="panel duel hidden" id="duel-panel">
+        <div class="builder-toolbar">
+          <div class="toolbar-left">
+            <button class="ghost" id="duel-back">&larr; Menu</button>
+            <div class="title-stack">
+              <p class="label">Duel station</p>
+              <p class="muted">Quick mirror, pass-and-play, or light testing</p>
+            </div>
+          </div>
+          <div class="toolbar-actions">
+            <div class="pill" id="duel-phase">Start</div>
+            <button class="ghost" id="advance-phase">Advance Phase</button>
+          </div>
+        </div>
+
+        <div class="duel-grid">
+          <div class="panel section">
+            <div class="panel-head">
+              <div>
+                <p class="label">Matchmaking</p>
+                <p class="muted">Start a mirror duel using your current deck</p>
+              </div>
+            </div>
+            <div class="field">
+              <span>Your wizard name</span>
+              <input id="duel-player-name" type="text" />
+            </div>
+            <div class="field">
+              <span>Opponent name</span>
+              <input id="duel-opponent-name" type="text" />
+            </div>
+            <p class="muted">
+              The duel engine uses your saved or current decklist. Both players draw from separate copies to keep testing fair.
+            </p>
+            <button class="cta" id="start-duel">Start Duel</button>
+            <div class="status" id="duel-status" role="status" aria-live="polite"></div>
+          </div>
+
+          <div class="panel section">
+            <div class="panel-head">
+              <div>
+                <p class="label">Field state</p>
+                <p class="muted">Mobile-friendly tracking for hotseat play</p>
+              </div>
+              <button class="ghost" id="reset-duel">Reset</button>
+            </div>
+
+            <div id="duel-table" class="duel-table hidden" aria-live="polite">
+              <div class="player-rows" id="player-rows"></div>
+              <div class="phase-banner">
+                <p class="label">Phase</p>
+                <p class="muted" id="phase-label">—</p>
+                <p class="muted" id="turn-label">Turn 1</p>
+              </div>
+              <div class="hand-row">
+                <p class="label">Active Hand</p>
+                <div class="hand-grid" id="hand-grid"></div>
+              </div>
+              <div class="void-row">
+                <p class="label">Haunt / Void</p>
+                <div class="hand-grid" id="void-grid"></div>
+              </div>
+              <div class="log" id="duel-log" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="foot">Health check at <code>/health</code></footer>
@@ -147,6 +215,7 @@
       </div>
     </div>
 
+    <script src="duel-engine.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

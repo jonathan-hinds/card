@@ -1,6 +1,12 @@
 const MAX_DECK_SIZE = 20;
 const MAX_COPIES_PER_CARD = 3;
 
+const Resource = Object.freeze({
+  VITALITY: 'vitality',
+  WILL: 'will',
+  SOULFIRE: 'soulfire',
+});
+
 const tabs = document.querySelectorAll('.tab');
 const registerForm = document.getElementById('register-form');
 const loginForm = document.getElementById('login-form');
@@ -429,6 +435,75 @@ class DuelEngine {
     };
   }
 
+  snapshot() {
+    return {
+      ...this.state,
+      phase: PHASES[this.state.phaseIndex],
+      players: this.players.map((player) => ({
+        ...player,
+        hand: [...player.hand],
+        deck: [...player.deck],
+        discard: [...player.discard],
+        void: [...player.void],
+        inPlay: [...player.inPlay],
+      })),
+    };
+  }
+
+  getOpponentIndex(index) {
+    return index === 0 ? 1 : 0;
+  }
+
+  getTargetWizard(effect, controllerIndex) {
+    switch (effect.target) {
+      case 'self':
+      case 'controller':
+      case 'attached-wizard':
+        return controllerIndex;
+      case 'enemy-wizard':
+        return this.getOpponentIndex(controllerIndex);
+      case 'any-wizard':
+      case 'any-target':
+      default: {
+        if (['DAMAGE', 'DISCARD', 'ATTACH_HEX'].includes(effect.effectType)) {
+          return this.getOpponentIndex(controllerIndex);
+        }
+        return controllerIndex;
+      }
+    }
+  }
+
+  applyWard(targetPlayer, amount, resourceType) {
+    if (targetPlayer.ward.amount > 0) {
+      this.log(`${targetPlayer.name} already has Ward this turn.`);
+      return;
+    }
+    targetPlayer.ward = { amount, resourceType: resourceType || null };
+    this.log(`${targetPlayer.name} gains Ward ${amount}.`);
+  }
+
+  applyBurn(targetPlayer, amount) {
+    targetPlayer.burn.push(amount);
+    this.log(`${targetPlayer.name} gains Burn ${amount}.`);
+  }
+
+  applyDamage(targetPlayer, amount, resourceType) {
+    let pending = amount;
+    if (targetPlayer.ward.amount > 0) {
+      const prevented = Math.min(targetPlayer.ward.amount, pending);
+      pending -= prevented;
+      targetPlayer.ward.amount -= prevented;
+      this.log(`${targetPlayer.name}'s Ward prevents ${prevented} damage.`);
+    }
+
+    if (pending <= 0) return 0;
+
+    const key = resourceType === Resource.WILL ? 'will' : 'vitality';
+    targetPlayer[key] = Math.max(0, targetPlayer[key] - pending);
+    this.log(`${targetPlayer.name} loses ${pending} ${key === 'will' ? 'Will' : 'Vitality'}.`);
+    return pending;
+  }
+
   log(message) {
     this.state.logs.unshift({ message, at: new Date().toISOString() });
   }
@@ -450,6 +525,11 @@ class DuelEngine {
       will: 10,
       maxSoulfire: 3,
       currentSoulfire: 3,
+      ward: { amount: 0, resourceType: null },
+      burn: [],
+      channel: 0,
+      spellsCastThisTurn: 0,
+      hauntUsedThisTurn: false,
       deck,
       hand: [],
       discard: [],
@@ -472,25 +552,11 @@ class DuelEngine {
     return this.snapshot();
   }
 
-  snapshot() {
-    return {
-      ...this.state,
-      phase: PHASES[this.state.phaseIndex],
-      players: this.players.map((player) => ({
-        ...player,
-        hand: [...player.hand],
-        deck: [...player.deck],
-        discard: [...player.discard],
-        void: [...player.void],
-        inPlay: [...player.inPlay],
-      })),
-    };
-  }
-
   setPhase(phaseName) {
     const index = PHASES.indexOf(phaseName);
     this.state.phaseIndex = Math.max(0, index);
     this.state.phase = phaseName;
+    this.log(`Phase: ${phaseName}`);
     if (phaseName === 'Start') {
       this.runStartPhase();
     } else if (phaseName === 'Draw') {
@@ -517,15 +583,30 @@ class DuelEngine {
     this.state.turn += 1;
     this.state.phaseIndex = 0;
     this.players[this.state.activePlayer].drewAfterReshuffleThisTurn = false;
+    this.players[this.state.activePlayer].spellsCastThisTurn = 0;
+    this.players[this.state.activePlayer].hauntUsedThisTurn = false;
     this.setPhase('Start');
     return this.snapshot();
   }
 
   runStartPhase() {
     const player = this.players[this.state.activePlayer];
+    player.ward = { amount: 0, resourceType: null };
+    player.channel = 0;
+    player.spellsCastThisTurn = 0;
+    player.hauntUsedThisTurn = false;
     player.maxSoulfire = Math.min(10, player.maxSoulfire + 1);
     player.currentSoulfire = player.maxSoulfire;
     this.log(`${player.name} refreshes to ${player.currentSoulfire} Soulfire.`);
+
+    if (player.burn.length) {
+      player.burn = player.burn.filter((value) => {
+        this.applyDamage(player, value, Resource.VITALITY);
+        return false; // Burn markers expire after triggering once
+      });
+    }
+
+    this.resolveOngoing(player, 'start-of-turn');
   }
 
   runDrawPhase() {
@@ -540,6 +621,7 @@ class DuelEngine {
 
   runEndPhase() {
     const player = this.players[this.state.activePlayer];
+    this.resolveOngoing(player, 'end-of-turn');
     if (player.hand.length > 7) {
       const extra = player.hand.splice(7);
       player.discard.push(...extra);
@@ -551,6 +633,8 @@ class DuelEngine {
       this.log(`${player.name} loses 1 Will after drawing post-reshuffle.`);
     }
     player.drewAfterReshuffleThisTurn = false;
+    player.ward = { amount: 0, resourceType: null };
+    player.channel = 0;
   }
 
   drawCards(playerIndex, count) {
@@ -591,16 +675,187 @@ class DuelEngine {
     this.log(`${player.name} reshuffles their discard, void, and ongoing cards.`);
   }
 
+  resolveOngoing(player, timing) {
+    player.inPlay.forEach((hex) => {
+      if (!hex.ongoing) return;
+      hex.ongoing.forEach((effect) => {
+        if (effect.timing && effect.timing !== timing) return;
+        if (effect.effectType === 'DAMAGE') {
+          const targetIndex = hex.attachedTo ?? this.players.indexOf(player);
+          const target = this.players[targetIndex];
+          this.applyDamage(target, effect.amount, effect.resource);
+        }
+        if (effect.effectType === 'STATUS_TRIGGER' && effect.status === 'no-spell-cast') {
+          const targetIndex = hex.attachedTo ?? this.players.indexOf(player);
+          const targetWizard = this.players[targetIndex];
+          if (targetWizard.spellsCastThisTurn === 0) {
+            this.applyDamage(targetWizard, effect.reaction.amount, effect.reaction.resource);
+          }
+        }
+      });
+    });
+  }
+
+  canPayAdditionalCost(player, cost) {
+    if (!cost) return false;
+    if (cost.resource === Resource.VITALITY) return player.vitality >= cost.amount;
+    if (cost.resource === Resource.WILL) return player.will >= cost.amount;
+    return false;
+  }
+
+  payAdditionalCost(player, cost, card) {
+    if (!cost) return;
+    if (cost.resource === Resource.VITALITY) {
+      player.vitality = Math.max(0, player.vitality - cost.amount);
+      this.log(`${player.name} pays ${cost.amount} Vitality for ${card.name}.`);
+    }
+    if (cost.resource === Resource.WILL) {
+      player.will = Math.max(0, player.will - cost.amount);
+      this.log(`${player.name} pays ${cost.amount} Will for ${card.name}.`);
+    }
+  }
+
+  dispelHexes(targetIndex, amount) {
+    let remaining = amount;
+    this.players.forEach((owner) => {
+      const kept = [];
+      owner.inPlay.forEach((hex) => {
+        if (remaining > 0 && hex.cardType === 'Hex' && hex.attachedTo === targetIndex) {
+          owner.void.push(hex);
+          remaining -= 1;
+          this.log(`${hex.name} is dispelled.`);
+        } else {
+          kept.push(hex);
+        }
+      });
+      owner.inPlay = kept;
+    });
+  }
+
+  checkCondition(condition, controllerIndex) {
+    if (!condition) return false;
+    const targetIndex = this.getTargetWizard(condition, controllerIndex);
+    const target = this.players[targetIndex];
+    if (!target) return false;
+
+    if (condition.effectType === 'WARD' && condition.target === 'controller') {
+      return target.ward.amount > 0;
+    }
+
+    if (condition.thresholdResource) {
+      const current = condition.thresholdResource === Resource.WILL ? target.will : target.vitality;
+      if (condition.comparison === 'or-less') {
+        return current <= condition.threshold;
+      }
+      if (condition.comparison === 'or-more') {
+        return current >= condition.threshold;
+      }
+    }
+
+    if (condition.voidSizeAtLeast) {
+      return target.void.length >= condition.voidSizeAtLeast;
+    }
+
+    return false;
+  }
+
+  applyEffect(effect, context) {
+    const controller = this.players[context.controllerIndex];
+    const targetIndex = this.getTargetWizard(effect, context.controllerIndex);
+    const target = this.players[targetIndex];
+
+    switch (effect.effectType) {
+      case 'COST_PAYMENT':
+        if (effect.resource === Resource.VITALITY) {
+          controller.vitality = Math.max(0, controller.vitality - effect.amount);
+          this.log(`${controller.name} pays ${effect.amount} Vitality.`);
+        }
+        if (effect.resource === Resource.WILL) {
+          controller.will = Math.max(0, controller.will - effect.amount);
+          this.log(`${controller.name} pays ${effect.amount} Will.`);
+        }
+        break;
+      case 'DAMAGE': {
+        const dealt = this.applyDamage(target, effect.amount, effect.resource);
+        if (effect.resource === Resource.VITALITY) {
+          context.vitalityDamageDealt += dealt;
+        }
+        break;
+      }
+      case 'DRAIN':
+        if (context.vitalityDamageDealt > 0) {
+          controller.vitality = Math.min(20, controller.vitality + effect.amount);
+          this.log(`${controller.name} drains ${effect.amount} Vitality.`);
+        }
+        break;
+      case 'CHANNEL':
+        controller.channel = Math.max(controller.channel, effect.amount);
+        this.log(`${controller.name} gains Channel ${effect.amount} for their next spell this turn.`);
+        break;
+      case 'BURN':
+        this.applyBurn(target, effect.amount);
+        break;
+      case 'WARD':
+        this.applyWard(target, effect.amount, effect.resourceFocus);
+        if (targetIndex === context.controllerIndex) {
+          context.wardedSelfThisSpell = true;
+        }
+        break;
+      case 'DRAW':
+        this.drawCards(context.controllerIndex, effect.amount);
+        break;
+      case 'DISCARD':
+        if (target.hand.length > 0) {
+          const discarded = target.hand.shift();
+          target.discard.push(discarded);
+          this.log(`${target.name} discards ${discarded.name}.`);
+        } else {
+          this.log(`${target.name} has no cards to discard.`);
+        }
+        break;
+      case 'ATTACH_HEX':
+        context.lastAttachedTarget = targetIndex;
+        if (effect.ongoing) {
+          controller.inPlay.push({ ...context.card, attachedTo: targetIndex, ongoing: effect.ongoing });
+          context.hexAttached = true;
+        }
+        break;
+      case 'DISPEL':
+        this.dispelHexes(targetIndex, effect.amount);
+        break;
+      case 'INSIGHT':
+        this.log(`${controller.name} looks at the top ${effect.amount} cards (Insight).`);
+        break;
+      case 'CONDITIONAL':
+        if (this.checkCondition(effect.condition, context.controllerIndex)) {
+          (effect.then || []).forEach((next) => this.applyEffect(next, context));
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   playFromHand(playerIndex, handIndex) {
     const player = this.players[playerIndex];
     if (!player || playerIndex !== this.state.activePlayer) {
       this.log('Not your turn.');
       return this.snapshot();
     }
+    if (this.state.phase !== 'Main') {
+      this.log('You can only cast during your Main phase.');
+      return this.snapshot();
+    }
     const card = player.hand[handIndex];
     if (!card) return this.snapshot();
 
-    const cost = card.cost?.soulfire ?? 0;
+    let cost = card.cost?.soulfire ?? 0;
+    if (player.channel > 0) {
+      const reduction = Math.min(player.channel, cost - 1);
+      cost = Math.max(1, cost - player.channel);
+      this.log(`Channel reduces cost by ${reduction}.`);
+      player.channel = 0;
+    }
     if (player.currentSoulfire < cost) {
       this.log(`Not enough Soulfire to play ${card.name}.`);
       return this.snapshot();
@@ -608,9 +863,30 @@ class DuelEngine {
 
     player.currentSoulfire -= cost;
     player.hand.splice(handIndex, 1);
+    player.spellsCastThisTurn += 1;
+
+    const ritual = card.effects.find((effect) => effect.effectType === 'RITUAL_MODE');
+    let effects = [...card.effects];
+    if (ritual && this.canPayAdditionalCost(player, ritual.ritualCost)) {
+      this.payAdditionalCost(player, ritual.ritualCost, card);
+      effects = ritual.replaces;
+      this.log(`${player.name} casts ${card.name} in Ritual mode.`);
+    }
+
+    const context = {
+      controllerIndex: playerIndex,
+      card,
+      vitalityDamageDealt: 0,
+      wardedSelfThisSpell: false,
+      hexAttached: false,
+    };
+
+    effects.forEach((effect) => this.applyEffect(effect, context));
 
     if (card.cardType === 'Hex') {
-      player.inPlay.push(card);
+      if (!context.hexAttached) {
+        player.inPlay.push({ ...card, attachedTo: context.lastAttachedTarget ?? playerIndex });
+      }
     } else {
       player.discard.push(card);
     }
@@ -781,7 +1057,8 @@ function refreshDuelUI() {
   renderLog(snapshot.logs);
 
   duelPhase.textContent = `${snapshot.phase} Phase`;
-  turnIndicator.textContent = `Turn ${snapshot.turn}`;
+  const whoseTurn = snapshot.activePlayer === 0 ? 'Your turn' : "Opponent's turn";
+  turnIndicator.textContent = `Turn ${snapshot.turn} — ${whoseTurn}`;
 }
 
 async function prepareDuelHub() {

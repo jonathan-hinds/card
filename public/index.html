@@ -171,49 +171,48 @@
           </div>
           <div class="duel-controls">
             <div class="pill" id="turn-indicator">Turn —</div>
-            <button class="ghost" id="advance-phase">Advance phase</button>
-            <button class="cta" id="end-turn">End turn</button>
             <button class="ghost" id="duel-exit">Exit duel</button>
           </div>
         </div>
 
-        <div class="duel-mat">
-          <div class="duel-player" id="opponent-panel">
-            <div class="duel-player-head">
-              <div>
-                <p class="label" id="opponent-name">Opponent</p>
-                <p class="muted" id="opponent-status">Ready</p>
-              </div>
-              <div class="duel-stats" id="opponent-stats"></div>
+        <div class="duel-board">
+          <div class="zone hand" id="opponent-hand-zone">
+            <div class="zone-head">
+              <p class="label" id="opponent-name">Opponent hand</p>
+              <p class="muted" id="opponent-status">Ready</p>
             </div>
-            <div class="pile-grid" id="opponent-piles"></div>
+            <div class="hand-contents" id="opponent-hand"></div>
           </div>
 
-          <div class="duel-center">
-            <p class="label">Phase tracker</p>
-            <div class="phase-track" id="phase-track"></div>
-            <p class="muted">Draw cards, play from hand during Main, then end the turn.</p>
-            <div class="duel-log" id="duel-log" aria-live="polite"></div>
+          <div class="zone stats" id="opponent-stats"></div>
+
+          <div class="zone" id="opponent-void"></div>
+          <div class="zone" id="opponent-active"></div>
+          <div class="zone" id="opponent-discard"></div>
+
+          <div class="zone" id="player-void"></div>
+          <div class="zone" id="player-active"></div>
+          <div class="zone controls" id="player-discard-block">
+            <div class="zone" id="player-discard"></div>
+            <button class="cta end-phase" id="end-turn">End Phase</button>
           </div>
 
-          <div class="duel-player self" id="player-panel">
-            <div class="duel-player-head">
-              <div>
-                <p class="label" id="player-name">You</p>
-                <p class="muted" id="player-status">Waiting</p>
-              </div>
-              <div class="duel-stats" id="player-stats"></div>
+          <div class="zone stats" id="player-stats"></div>
+          <div class="zone hand self" id="player-hand-zone">
+            <div class="zone-head">
+              <p class="label" id="player-name">Your hand</p>
+              <p class="muted" id="player-status">Waiting</p>
             </div>
-            <div class="pile-grid" id="player-piles"></div>
+            <div class="hand-grid" id="hand-grid"></div>
           </div>
         </div>
 
-        <div class="duel-hand">
-          <div class="panel-head">
-            <p class="label">Your hand</p>
-            <button class="ghost tiny" id="draw-card">Draw</button>
+        <div class="duel-info">
+          <div>
+            <p class="label">Phase tracker</p>
+            <div class="phase-track" id="phase-track"></div>
           </div>
-          <div class="hand-grid" id="hand-grid"></div>
+          <div class="duel-log" id="duel-log" aria-live="polite"></div>
         </div>
       </section>
     </main>

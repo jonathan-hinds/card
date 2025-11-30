@@ -29,9 +29,7 @@ const queueTypeLocal = document.getElementById('queue-type-local');
 const queueTypeMatch = document.getElementById('queue-type-match');
 const duelPhase = document.getElementById('duel-phase');
 const turnIndicator = document.getElementById('turn-indicator');
-const advancePhaseButton = document.getElementById('advance-phase');
 const endTurnButton = document.getElementById('end-turn');
-const drawCardButton = document.getElementById('draw-card');
 
 const playerNameLabel = document.getElementById('player-name');
 const opponentNameLabel = document.getElementById('opponent-name');
@@ -39,8 +37,14 @@ const playerStatusText = document.getElementById('player-status');
 const opponentStatusText = document.getElementById('opponent-status');
 const playerStats = document.getElementById('player-stats');
 const opponentStats = document.getElementById('opponent-stats');
-const playerPiles = document.getElementById('player-piles');
-const opponentPiles = document.getElementById('opponent-piles');
+const opponentHandBox = document.getElementById('opponent-hand');
+const opponentHandZone = document.getElementById('opponent-hand-zone');
+const opponentVoidZone = document.getElementById('opponent-void');
+const opponentActiveZone = document.getElementById('opponent-active');
+const opponentDiscardZone = document.getElementById('opponent-discard');
+const playerVoidZone = document.getElementById('player-void');
+const playerActiveZone = document.getElementById('player-active');
+const playerDiscardZone = document.getElementById('player-discard');
 const phaseTrack = document.getElementById('phase-track');
 const duelLogBox = document.getElementById('duel-log');
 const handGrid = document.getElementById('hand-grid');
@@ -559,25 +563,21 @@ class DuelEngine {
     this.log(`Phase: ${phaseName}`);
     if (phaseName === 'Start') {
       this.runStartPhase();
-    } else if (phaseName === 'Draw') {
+      return this.setPhase('Draw');
+    }
+    if (phaseName === 'Draw') {
       this.runDrawPhase();
-    } else if (phaseName === 'End') {
+      return this.setPhase('Main');
+    }
+    if (phaseName === 'End') {
       this.runEndPhase();
     }
-  }
-
-  advancePhase() {
-    if (PHASES[this.state.phaseIndex] === 'End') {
-      return this.endTurn();
-    }
-    const nextIndex = (this.state.phaseIndex + 1) % PHASES.length;
-    this.setPhase(PHASES[nextIndex]);
     return this.snapshot();
   }
 
   endTurn() {
     if (this.state.phase !== 'End') {
-      this.runEndPhase();
+      this.setPhase('End');
     }
     this.state.activePlayer = this.state.activePlayer === 0 ? 1 : 0;
     this.state.turn += 1;
@@ -585,8 +585,7 @@ class DuelEngine {
     this.players[this.state.activePlayer].drewAfterReshuffleThisTurn = false;
     this.players[this.state.activePlayer].spellsCastThisTurn = 0;
     this.players[this.state.activePlayer].hauntUsedThisTurn = false;
-    this.setPhase('Start');
-    return this.snapshot();
+    return this.setPhase('Start');
   }
 
   runStartPhase() {
@@ -934,7 +933,7 @@ function renderStats(container, player, isActive) {
     { label: 'Vitality', value: player.vitality },
     { label: 'Will', value: player.will },
     { label: 'Soulfire', value: `${player.currentSoulfire}/${player.maxSoulfire}` },
-    { label: 'Hand', value: player.hand.length },
+    { label: 'Deck', value: player.deck.length },
   ];
   stats.forEach((stat) => {
     const box = document.createElement('div');
@@ -953,41 +952,66 @@ function renderStats(container, player, isActive) {
   });
 }
 
-function renderPiles(container, player, isSelf) {
-  if (!container || !player) return;
+function renderPileZone(container, labelText, cards, note) {
+  if (!container) return;
   container.innerHTML = '';
-  const piles = [
-    { key: 'deck', label: 'Deck', value: player.deck.length },
-    { key: 'discard', label: 'Discard', value: player.discard.length },
-    { key: 'void', label: 'Void', value: player.void.length },
-    { key: 'inPlay', label: 'In Play', value: player.inPlay.length },
-    { key: 'hand', label: 'Hand', value: player.hand.length, note: isSelf ? 'Tap below to play' : 'Hidden' },
-  ];
+  const label = document.createElement('p');
+  label.className = 'label';
+  label.textContent = labelText;
+  const value = document.createElement('p');
+  value.className = 'zone-value';
+  value.textContent = cards.length;
+  container.append(label, value);
+  if (note) {
+    const helper = document.createElement('p');
+    helper.className = 'muted small';
+    helper.textContent = note;
+    container.appendChild(helper);
+  }
+  if (cards.length) {
+    const preview = document.createElement('p');
+    preview.className = 'muted small';
+    preview.textContent = cards.map((c) => c.name).slice(0, 3).join(', ');
+    container.appendChild(preview);
+  }
+}
 
-  piles.forEach((pile) => {
-    const box = document.createElement('div');
-    box.className = `pile ${pile.key === 'hand' ? 'small' : ''}`;
-    const label = document.createElement('p');
-    label.className = 'label';
-    label.textContent = pile.label;
-    const value = document.createElement('p');
-    value.className = 'value';
-    value.textContent = pile.value;
-    box.append(label, value);
-    if (pile.note) {
-      const note = document.createElement('p');
-      note.className = 'muted small';
-      note.textContent = pile.note;
-      box.appendChild(note);
-    }
-    if (pile.key === 'inPlay' && player.inPlay.length) {
-      const names = document.createElement('p');
-      names.className = 'muted small';
-      names.textContent = player.inPlay.map((c) => c.name).join(', ');
-      box.appendChild(names);
-    }
-    container.appendChild(box);
+function renderActiveZone(container, cards) {
+  if (!container) return;
+  container.innerHTML = '';
+  const label = document.createElement('p');
+  label.className = 'label';
+  label.textContent = 'Active cards';
+  container.appendChild(label);
+  if (!cards.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = 'None in play';
+    container.appendChild(empty);
+    return;
+  }
+
+  const tags = document.createElement('div');
+  tags.className = 'active-cards';
+  cards.forEach((card) => {
+    const chip = document.createElement('span');
+    chip.className = 'active-tag';
+    chip.textContent = card.name;
+    tags.appendChild(chip);
   });
+  container.appendChild(tags);
+}
+
+function renderOpponentHand(count) {
+  if (!opponentHandBox || !opponentHandZone) return;
+  opponentHandBox.innerHTML = '';
+  const countText = document.createElement('p');
+  countText.className = 'zone-value';
+  countText.textContent = count;
+  const note = document.createElement('p');
+  note.className = 'muted small';
+  note.textContent = 'Hidden from view';
+  opponentHandBox.append(countText, note);
 }
 
 function renderPhaseTrack(activePhase) {
@@ -1045,13 +1069,19 @@ function refreshDuelUI() {
 
   playerNameLabel.textContent = you.name;
   opponentNameLabel.textContent = foe.name;
-  playerStatusText.textContent = snapshot.activePlayer === 0 ? 'Your turn' : 'Waiting';
-  opponentStatusText.textContent = snapshot.activePlayer === 1 ? 'Their turn' : 'Waiting';
+  const playerActive = snapshot.activePlayer === 0;
+  playerStatusText.textContent = playerActive ? 'Your turn' : 'Waiting';
+  opponentStatusText.textContent = playerActive ? 'Waiting' : 'Their turn';
 
-  renderStats(playerStats, you, snapshot.activePlayer === 0);
-  renderStats(opponentStats, foe, snapshot.activePlayer === 1);
-  renderPiles(playerPiles, you, true);
-  renderPiles(opponentPiles, foe, false);
+  renderStats(playerStats, you, playerActive);
+  renderStats(opponentStats, foe, !playerActive);
+  renderPileZone(opponentVoidZone, `${foe.name} Void`, foe.void);
+  renderPileZone(opponentDiscardZone, `${foe.name} Discard`, foe.discard);
+  renderActiveZone(opponentActiveZone, foe.inPlay);
+  renderPileZone(playerVoidZone, `${you.name} Void`, you.void);
+  renderPileZone(playerDiscardZone, `${you.name} Discard`, you.discard, 'Void & discard reshuffle if empty');
+  renderActiveZone(playerActiveZone, you.inPlay);
+  renderOpponentHand(foe.hand.length);
   renderPhaseTrack(snapshot.phase);
   renderHand(you.hand);
   renderLog(snapshot.logs);
@@ -1168,27 +1198,9 @@ startLocalDuelButton.addEventListener('click', startLocalDuel);
 queueTypeLocal.addEventListener('click', () => setQueueMode('local'));
 queueTypeMatch.addEventListener('click', () => setQueueMode('match'));
 
-advancePhaseButton.addEventListener('click', () => {
-  if (!duelEngine) return;
-  duelEngine.advancePhase();
-  refreshDuelUI();
-});
-
 endTurnButton.addEventListener('click', () => {
   if (!duelEngine) return;
   duelEngine.endTurn();
-  refreshDuelUI();
-});
-
-drawCardButton.addEventListener('click', () => {
-  if (!duelEngine) return;
-  const snapshot = duelEngine.snapshot();
-  if (snapshot.activePlayer !== 0) {
-    duelEngine.log('Wait for your turn to draw.');
-    refreshDuelUI();
-    return;
-  }
-  duelEngine.drawCards(0, 1);
   refreshDuelUI();
 });
 

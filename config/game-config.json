@@ -1,0 +1,7 @@
+{
+  "board": {
+    "rows": 10,
+    "cols": 10
+  },
+  "handSize": 10
+}

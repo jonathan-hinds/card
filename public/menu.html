@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Black Gate · Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="masthead">
+      <p class="tag">Player Hub</p>
+      <h1>BLACK GATE</h1>
+      <p class="hint">Choose your destination.</p>
+    </header>
+
+    <main class="console narrow">
+      <section class="profile-block">
+        <p class="label">Current session</p>
+        <p class="value" id="profile-name">—</p>
+        <p class="muted" id="profile-meta">Loading profile…</p>
+        <div class="session-controls">
+          <button class="cta" onclick="window.location.href='/deck.html'">Deck</button>
+          <button class="cta" onclick="window.location.href='/play.html'">Play</button>
+          <button class="cta" onclick="window.location.href='/card-creator.html'">Card Creator</button>
+          <button class="ghost" id="logout">Logout</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">Hand size: 10 · Board: 10x10</footer>
+
+    <script type="module" src="/menu.js"></script>
+  </body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Black Gate · Deck Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="masthead">
+      <p class="tag">Deck Builder</p>
+      <h1>BLACK GATE</h1>
+      <p class="hint">Select up to 10 cards for matchmaking.</p>
+    </header>
+
+    <main class="console">
+      <section class="profile-block">
+        <p class="label">Current session</p>
+        <p class="value" id="profile-name">—</p>
+        <p class="muted" id="profile-meta">Loading…</p>
+        <div class="session-controls">
+          <button class="ghost" onclick="window.location.href='/menu.html'">Back</button>
+          <button class="ghost" id="logout">Logout</button>
+        </div>
+      </section>
+
+      <section class="deck-block">
+        <div class="section-title">
+          <p class="label">Hand builder</p>
+          <p class="muted">Add any card in your catalog.</p>
+        </div>
+        <form class="inline-form" id="hand-form">
+          <select name="cardSlug" id="hand-card-select"></select>
+          <input type="number" name="quantity" min="1" max="10" value="1" />
+          <button class="cta" type="submit">Add</button>
+          <button class="ghost" id="clear-hand" type="button">Clear</button>
+        </form>
+        <div class="catalog-grid" id="hand-list"></div>
+      </section>
+    </main>
+
+    <footer class="foot">Hand size cap: 10 cards</footer>
+
+    <script type="module" src="/deck.js"></script>
+  </body>
+</html>

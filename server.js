@@ -9,6 +9,7 @@ const gameConfig = require('./config/game-config.json');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || mongoConfig.mongoUri;
+const DATABASE_NAME = process.env.MONGO_DB_NAME || 'card-battles';
 const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
 
 let usersCollection;
@@ -50,7 +51,7 @@ async function ensureDatabase() {
   if (usersCollection && cardsCollection) return { usersCollection, cardsCollection };
   const client = new MongoClient(MONGO_URI);
   await client.connect();
-  const db = client.db('gothic-arcade');
+  const db = client.db(DATABASE_NAME);
   usersCollection = db.collection('players');
   cardsCollection = db.collection('cards');
   await usersCollection.createIndex({ username: 1 }, { unique: true });

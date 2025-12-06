@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Black Gate · Battlefield</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="masthead">
+      <p class="tag">Battlefield</p>
+      <h1>BLACK GATE</h1>
+      <p class="hint">Grid-driven duel. End your turn manually.</p>
+    </header>
+
+    <main class="console">
+      <section class="profile-block">
+        <p class="label">Current session</p>
+        <p class="value" id="profile-name">—</p>
+        <p class="muted" id="profile-meta">Loading…</p>
+        <div class="session-controls">
+          <button class="ghost" onclick="window.location.href='/play.html'">Back to matchmaking</button>
+          <button class="ghost" id="logout">Logout</button>
+        </div>
+      </section>
+
+      <section class="deck-block">
+        <div class="section-title">
+          <p class="label">Arena</p>
+          <p class="muted">Black and white UI</p>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="turn-panel">
+          <div>
+            <p class="label">Turn</p>
+            <p class="value" id="turn-indicator">—</p>
+          </div>
+          <button class="cta" id="end-turn" type="button">End Turn</button>
+        </div>
+        <div class="actions">
+          <div class="action-card">
+            <p class="label">Deploy</p>
+            <form id="deploy-form" class="stacked">
+              <select id="deploy-card"></select>
+              <input type="number" id="deploy-row" placeholder="row" min="0" />
+              <input type="number" id="deploy-col" placeholder="col" min="0" />
+              <button class="cta" type="submit">Place</button>
+            </form>
+          </div>
+          <div class="action-card">
+            <p class="label">Move</p>
+            <form id="move-form" class="stacked">
+              <input type="number" id="move-from-row" placeholder="from row" min="0" />
+              <input type="number" id="move-from-col" placeholder="from col" min="0" />
+              <input type="number" id="move-to-row" placeholder="to row" min="0" />
+              <input type="number" id="move-to-col" placeholder="to col" min="0" />
+              <button class="cta" type="submit">Move</button>
+            </form>
+          </div>
+          <div class="action-card">
+            <p class="label">Basic Attack</p>
+            <form id="attack-form" class="stacked">
+              <input type="number" id="attack-from-row" placeholder="from row" min="0" />
+              <input type="number" id="attack-from-col" placeholder="from col" min="0" />
+              <input type="number" id="attack-target-row" placeholder="target row" min="0" />
+              <input type="number" id="attack-target-col" placeholder="target col" min="0" />
+              <button class="cta" type="submit">Attack</button>
+            </form>
+          </div>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+    </main>
+
+    <footer class="foot">Attacks cost stamina · One card per turn</footer>
+
+    <script type="module" src="/battle.js"></script>
+  </body>
+</html>

@@ -85,6 +85,10 @@ h1 {
   z-index: 1;
 }
 
+.console.narrow {
+  width: min(560px, 100%);
+}
+
 .auth-block,
 .profile-block,
 .deck-block {

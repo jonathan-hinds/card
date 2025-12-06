@@ -3,24 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Black Gate</title>
+    <title>Black Gate · Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="noise"></div>
     <header class="masthead">
       <p class="tag">Player Access</p>
       <h1>BLACK GATE</h1>
-      <p class="hint">Draft cards, queue up, and duel on the grid.</p>
+      <p class="hint">Authenticate to enter the hub.</p>
     </header>
 
-    <main class="console">
+    <main class="console narrow">
       <section class="auth-block">
         <div class="tab-row" role="tablist">
           <button class="tab active" data-target="register" aria-selected="true" role="tab">Register</button>
@@ -53,111 +53,10 @@
 
         <div class="status" id="status" role="status" aria-live="polite"></div>
       </section>
-
-      <section class="profile-block" id="profile-card" hidden>
-        <p class="label">Current session</p>
-        <p class="value" id="profile-name">—</p>
-        <p class="muted" id="profile-meta"></p>
-        <div class="session-controls">
-          <button class="ghost" id="logout">Logout</button>
-        </div>
-      </section>
-
-      <section class="deck-block" id="card-catalog" hidden>
-        <div class="section-title">
-          <p class="label">Card catalog</p>
-          <p class="muted">Backed by MongoDB. Seeded with the Grunt.</p>
-        </div>
-        <div class="catalog-grid" id="catalog-list"></div>
-        <form class="inline-form" id="add-card-form">
-          <input type="text" name="slug" placeholder="slug" required />
-          <input type="text" name="name" placeholder="name" required />
-          <input type="number" name="health" placeholder="health" min="1" required />
-          <input type="number" name="min" placeholder="min dmg" min="0" required />
-          <input type="number" name="max" placeholder="max dmg" min="0" required />
-          <input type="number" name="stamina" placeholder="stamina" min="1" required />
-          <input type="number" name="speed" placeholder="speed" min="0" required />
-          <input type="number" name="range" placeholder="range" min="0" required />
-          <button class="cta" type="submit">Add Card</button>
-        </form>
-      </section>
-
-      <section class="deck-block" id="hand-builder" hidden>
-        <div class="section-title">
-          <p class="label">Hand builder</p>
-          <p class="muted">Add up to 10 cards to your hand for matchmaking.</p>
-        </div>
-        <form class="inline-form" id="hand-form">
-          <select name="cardSlug" id="hand-card-select"></select>
-          <input type="number" name="quantity" min="1" max="10" value="1" />
-          <button class="cta" type="submit">Add to hand</button>
-          <button class="ghost" id="clear-hand" type="button">Clear</button>
-        </form>
-        <div class="catalog-grid" id="hand-list"></div>
-      </section>
-
-      <section class="deck-block" id="matchmaking" hidden>
-        <div class="section-title">
-          <p class="label">Matchmaking</p>
-          <p class="muted">Queue to find another player. Each turn allows one deploy.</p>
-        </div>
-        <div class="inline-form">
-          <button class="cta" id="join-queue" type="button">Join queue</button>
-          <button class="ghost" id="leave-queue" type="button">Leave queue</button>
-        </div>
-        <div class="status" id="queue-status"></div>
-      </section>
-
-      <section class="deck-block" id="match-space" hidden>
-        <div class="section-title">
-          <p class="label">Arena</p>
-          <p class="muted">Grid driven duel. Black and white UI.</p>
-        </div>
-        <div class="board" id="board"></div>
-        <div class="turn-panel">
-          <div>
-            <p class="label">Turn</p>
-            <p class="value" id="turn-indicator">—</p>
-          </div>
-          <button class="cta" id="end-turn" type="button">End Turn</button>
-        </div>
-        <div class="actions">
-          <div class="action-card">
-            <p class="label">Deploy</p>
-            <form id="deploy-form" class="stacked">
-              <select id="deploy-card"></select>
-              <input type="number" id="deploy-row" placeholder="row" min="0" />
-              <input type="number" id="deploy-col" placeholder="col" min="0" />
-              <button class="cta" type="submit">Place</button>
-            </form>
-          </div>
-          <div class="action-card">
-            <p class="label">Move</p>
-            <form id="move-form" class="stacked">
-              <input type="number" id="move-from-row" placeholder="from row" min="0" />
-              <input type="number" id="move-from-col" placeholder="from col" min="0" />
-              <input type="number" id="move-to-row" placeholder="to row" min="0" />
-              <input type="number" id="move-to-col" placeholder="to col" min="0" />
-              <button class="cta" type="submit">Move</button>
-            </form>
-          </div>
-          <div class="action-card">
-            <p class="label">Basic Attack</p>
-            <form id="attack-form" class="stacked">
-              <input type="number" id="attack-from-row" placeholder="from row" min="0" />
-              <input type="number" id="attack-from-col" placeholder="from col" min="0" />
-              <input type="number" id="attack-target-row" placeholder="target row" min="0" />
-              <input type="number" id="attack-target-col" placeholder="target col" min="0" />
-              <button class="cta" type="submit">Attack</button>
-            </form>
-          </div>
-        </div>
-        <div class="log" id="log"></div>
-      </section>
     </main>
 
     <footer class="foot">Health check at <code>/health</code> · Game board size: 10x10</footer>
 
-    <script src="script.js"></script>
+    <script type="module" src="/login.js"></script>
   </body>
 </html>

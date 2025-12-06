@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Black Gate · Matchmaking</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="masthead">
+      <p class="tag">Matchmaking</p>
+      <h1>BLACK GATE</h1>
+      <p class="hint">Queue up, then launch the battlefield.</p>
+    </header>
+
+    <main class="console">
+      <section class="profile-block">
+        <p class="label">Current session</p>
+        <p class="value" id="profile-name">—</p>
+        <p class="muted" id="profile-meta">Loading…</p>
+        <div class="session-controls">
+          <button class="ghost" onclick="window.location.href='/menu.html'">Back</button>
+          <button class="ghost" id="logout">Logout</button>
+        </div>
+      </section>
+
+      <section class="deck-block">
+        <div class="section-title">
+          <p class="label">Queue</p>
+          <p class="muted">One deploy per turn.</p>
+        </div>
+        <div class="inline-form">
+          <button class="cta" id="join-queue" type="button">Join queue</button>
+          <button class="ghost" id="leave-queue" type="button">Leave queue</button>
+          <button class="cta" id="open-battlefield" type="button">Open battlefield</button>
+        </div>
+        <div class="status" id="queue-status"></div>
+      </section>
+    </main>
+
+    <footer class="foot">Battlefield opens when a match is ready</footer>
+
+    <script type="module" src="/play.js"></script>
+  </body>
+</html>

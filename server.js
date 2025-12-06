@@ -14,6 +14,7 @@ const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
 
 let usersCollection;
 let cardsCollection;
+let abilitiesCollection;
 
 const matchmakingQueue = [];
 const matches = new Map();
@@ -48,16 +49,33 @@ function verifyToken(token) {
 }
 
 async function ensureDatabase() {
-  if (usersCollection && cardsCollection) return { usersCollection, cardsCollection };
+  if (usersCollection && cardsCollection && abilitiesCollection) {
+    return { usersCollection, cardsCollection, abilitiesCollection };
+  }
   const client = new MongoClient(MONGO_URI);
   await client.connect();
   const db = client.db(DATABASE_NAME);
   usersCollection = db.collection('players');
   cardsCollection = db.collection('cards');
+  abilitiesCollection = db.collection('abilities');
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await cardsCollection.createIndex({ slug: 1 }, { unique: true });
+  await abilitiesCollection.createIndex({ slug: 1 }, { unique: true });
+  await seedAbilities(abilitiesCollection);
   await seedCards(cardsCollection);
-  return { usersCollection, cardsCollection };
+  return { usersCollection, cardsCollection, abilitiesCollection };
+}
+
+async function seedAbilities(collection) {
+  const basicAttack = {
+    slug: 'basic-attack',
+    name: 'Basic Attack',
+    staminaCost: 1,
+    description: 'Strike a nearby foe using the unit\'s damage range.',
+    createdAt: new Date(),
+  };
+
+  await collection.updateOne({ slug: basicAttack.slug }, { $setOnInsert: basicAttack }, { upsert: true });
 }
 
 async function seedCards(collection) {
@@ -71,13 +89,7 @@ async function seedCards(collection) {
       speed: 1,
       attackRange: 1,
     },
-    abilities: [
-      {
-        name: 'Basic Attack',
-        staminaCost: 1,
-        description: 'Strike a nearby foe for 1-3 damage.',
-      },
-    ],
+    abilities: ['basic-attack'],
     createdAt: new Date(),
   };
   await collection.updateOne({ slug: grunt.slug }, { $setOnInsert: grunt }, { upsert: true });
@@ -130,6 +142,11 @@ async function loadPlayer(username) {
 
 async function getCardBySlug(slug) {
   const { cardsCollection: collection } = await ensureDatabase();
+  return collection.findOne({ slug });
+}
+
+async function getAbilityBySlug(slug) {
+  const { abilitiesCollection: collection } = await ensureDatabase();
   return collection.findOne({ slug });
 }
 
@@ -444,6 +461,9 @@ function defeatIfEmpty(match, opponent) {
 }
 
 async function buildUnit(card, owner) {
+  const abilitySlugs = (card.abilities || [])
+    .map((ability) => (typeof ability === 'string' ? ability : ability.slug))
+    .filter(Boolean);
   return {
     owner,
     slug: card.slug,
@@ -454,6 +474,7 @@ async function buildUnit(card, owner) {
     speed: card.stats.speed,
     attackRange: card.stats.attackRange,
     damage: card.stats.damage,
+    abilities: abilitySlugs,
     summoningSickness: true,
   };
 }
@@ -530,7 +551,7 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
   }
 });
 
-app.post('/api/matches/:id/attack', requireAuth, (req, res) => {
+app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
@@ -538,7 +559,7 @@ app.post('/api/matches/:id/attack', requireAuth, (req, res) => {
     ensureActive(match);
     ensureTurn(match, req.player);
 
-    const { fromRow, fromCol, targetRow, targetCol } = req.body || {};
+    const { fromRow, fromCol, targetRow, targetCol, abilitySlug } = req.body || {};
     assertCell(match, fromRow, fromCol);
     assertCell(match, targetRow, targetCol);
 
@@ -548,15 +569,27 @@ app.post('/api/matches/:id/attack', requireAuth, (req, res) => {
     if (attacker.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
     if (!defender) throw Object.assign(new Error('No target at location.'), { status: 400 });
     if (defender.owner === req.player) throw Object.assign(new Error('Cannot attack your own unit.'), { status: 400 });
-    if (attacker.stamina <= 0) throw Object.assign(new Error('Not enough stamina.'), { status: 400 });
     if (!withinRange(attacker, { row: fromRow, col: fromCol }, { row: targetRow, col: targetCol })) {
       throw Object.assign(new Error('Target out of range.'), { status: 400 });
     }
 
+    const chosenAbilitySlug = abilitySlug || (attacker.abilities || [])[0] || 'basic-attack';
+    if (!chosenAbilitySlug) throw Object.assign(new Error('No ability selected.'), { status: 400 });
+    const knowsAbility = !attacker.abilities || attacker.abilities.length === 0 || attacker.abilities.includes(chosenAbilitySlug);
+    if (!knowsAbility) {
+      throw Object.assign(new Error('Unit does not know that ability.'), { status: 400 });
+    }
+
+    const ability = await getAbilityBySlug(chosenAbilitySlug);
+    if (!ability) throw Object.assign(new Error('Ability not found.'), { status: 404 });
+    if (attacker.stamina < ability.staminaCost) {
+      throw Object.assign(new Error('Not enough stamina.'), { status: 400 });
+    }
+
     const roll = Math.floor(Math.random() * (attacker.damage.max - attacker.damage.min + 1)) + attacker.damage.min;
     defender.health -= roll;
-    attacker.stamina -= 1;
-    match.log.push(`${req.player}'s ${attacker.name} used Basic Attack for ${roll} damage.`);
+    attacker.stamina -= ability.staminaCost;
+    match.log.push(`${req.player}'s ${attacker.name} used ${ability.name} for ${roll} damage.`);
 
     if (defender.health <= 0) {
       match.board[targetRow][targetCol] = null;

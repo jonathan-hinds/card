@@ -17,7 +17,7 @@ async function refreshCatalog() {
       <p class="label">${card.name}</p>
       <p class="muted">slug: ${card.slug}</p>
       <p>${formatStats(card)}</p>
-      <p class="muted">${(card.abilities || []).map((a) => a.name).join(', ') || 'Abilities pending'}</p>
+      <p class="muted">Abilities: ${(card.abilities || []).join(', ') || 'Abilities pending'}</p>
     `;
     catalogList.appendChild(cardEl);
   });

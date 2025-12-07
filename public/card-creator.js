@@ -47,7 +47,7 @@ function createEffectCard(effect) {
         <p class="label">${effect.name}</p>
         <p class="muted">${effect.type || 'neutral'} · Target ${target}</p>
       </div>
-      <p class="pill">${effect.slug}</p>
+      <p class="slug-label">${effect.slug}</p>
     </div>
     <p>${modifierSummary || 'No modifiers'}</p>
     <p class="muted">${effect.description || 'No description'}</p>
@@ -67,16 +67,20 @@ function createAbilityCard(ability) {
     ? ability.range ?? ability.attackRange
     : '—';
   abilityEl.innerHTML = `
-    <div class="card-header">
+    <div class="card-header tight">
       <div>
         <p class="label">${ability.name}</p>
-        <p class="muted">Target ${ability.targetType || 'enemy'} · Cost ${ability.staminaCost} STA</p>
+        <p class="muted small-text">${ability.description || 'No description'}</p>
       </div>
-      <p class="pill">${ability.slug}</p>
+      <p class="slug-label">${ability.slug}</p>
     </div>
-    <p>Damage ${damage} · Range ${range}</p>
-    <p class="muted">Effects: ${formatEffects(ability.effects)}</p>
-    <p class="muted">${ability.description || 'No description'}</p>
+    <div class="ability-meta">
+      <span>Target ${ability.targetType || 'enemy'}</span>
+      <span>Cost ${ability.staminaCost} STA</span>
+      <span>Range ${range}</span>
+      <span>DMG ${damage}</span>
+    </div>
+    <p class="muted small-text">Effects: ${formatEffects(ability.effects)}</p>
     <div class="card-actions">
       <button class="ghost" data-edit-ability="${ability.slug}">Edit</button>
       <button class="ghost danger" data-delete-ability="${ability.slug}">Delete</button>
@@ -147,9 +151,9 @@ async function refreshCatalog() {
           <p class="label">${card.name}</p>
           <p class="muted">${formatStats(card)}</p>
         </div>
-        <p class="pill">${card.slug}</p>
+        <p class="slug-label">${card.slug}</p>
       </div>
-      <p class="muted">Abilities: ${summarizeAbilities(cardAbilities)}</p>
+      <p class="muted">Abilities: ${cardAbilities.map((ability) => ability?.name).filter(Boolean).join(', ') || 'None'}</p>
     `;
 
     const abilityWrapper = document.createElement('div');

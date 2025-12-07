@@ -90,8 +90,6 @@ function renderBoard(board) {
 
         const bodyEl = document.createElement('div');
         bodyEl.className = 'unit-body';
-        const abilityHeader = document.createElement('div');
-        abilityHeader.className = 'ability-header';
         const abilityName = document.createElement('p');
         abilityName.className = 'ability-name';
         abilityName.textContent = ability.title;
@@ -101,11 +99,10 @@ function renderBoard(board) {
         if (ability.damage) metaParts.push(`DMG ${ability.damage}`);
         if (ability.cost) metaParts.push(`Cost ${ability.cost}`);
         abilityMeta.textContent = metaParts.join(' · ');
-        abilityHeader.append(abilityName, abilityMeta);
         const abilityDesc = document.createElement('p');
         abilityDesc.className = 'ability-desc';
         abilityDesc.textContent = ability.description;
-        bodyEl.append(abilityHeader, abilityDesc);
+        bodyEl.append(abilityName, abilityMeta, abilityDesc);
 
         const statsEl = document.createElement('div');
         statsEl.className = 'unit-stats';

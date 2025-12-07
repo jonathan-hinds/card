@@ -53,6 +53,35 @@
 
       <section class="deck-block">
         <div class="section-title">
+          <p class="label">Effect catalog</p>
+          <p class="muted">Create reusable gameplay effects.</p>
+        </div>
+        <div class="catalog-grid" id="effect-list"></div>
+        <form class="inline-form" id="add-effect-form">
+          <input type="text" name="slug" placeholder="slug" required />
+          <input type="text" name="name" placeholder="name" required />
+          <select name="type" required>
+            <option value="buff">Buff</option>
+            <option value="debuff">Debuff</option>
+            <option value="neutral">Neutral</option>
+          </select>
+          <select name="targetHint">
+            <option value="">Target hint</option>
+            <option value="enemy">Enemy</option>
+            <option value="friendly">Friendly</option>
+            <option value="any">Any</option>
+          </select>
+          <input type="text" name="duration" placeholder="duration (e.g. turn)" />
+          <input type="number" name="staminaChange" placeholder="stamina change" />
+          <input type="number" name="damageBonusMin" placeholder="bonus dmg min" />
+          <input type="number" name="damageBonusMax" placeholder="bonus dmg max" />
+          <input type="text" name="description" placeholder="description" />
+          <button class="cta" type="submit">Add Effect</button>
+        </form>
+      </section>
+
+      <section class="deck-block">
+        <div class="section-title">
           <p class="label">Ability catalog</p>
           <p class="muted">Reusable abilities assigned to cards.</p>
         </div>

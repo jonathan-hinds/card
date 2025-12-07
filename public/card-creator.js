@@ -10,6 +10,8 @@ const abilityList = document.getElementById('ability-list');
 const addAbilityForm = document.getElementById('add-ability-form');
 const abilityEffectSelect = document.getElementById('ability-effects');
 const abilityTargetSelect = document.getElementById('ability-target');
+const effectList = document.getElementById('effect-list');
+const addEffectForm = document.getElementById('add-effect-form');
 
 let abilities = [];
 let effects = [];
@@ -20,6 +22,25 @@ function formatEffects(effectSlugs = []) {
     .map((slug) => effects.find((effect) => effect.slug === slug)?.name || slug)
     .filter(Boolean);
   return names.join(', ');
+}
+
+function createEffectCard(effect) {
+  const effectEl = document.createElement('div');
+  effectEl.className = 'card';
+  const target = effect.targetHint || 'any';
+  const staminaChange = effect.modifiers?.staminaChange;
+  const damageBonus = effect.modifiers?.damageBonus;
+  const staminaText = typeof staminaChange === 'number' ? `${staminaChange >= 0 ? '+' : ''}${staminaChange} STA` : null;
+  const damageText = damageBonus ? `+${damageBonus.min}-${damageBonus.max} DMG` : null;
+  const modifierSummary = [staminaText, damageText].filter(Boolean).join(' · ');
+
+  effectEl.innerHTML = `
+    <p class="label">${effect.name}</p>
+    <p class="muted">slug: ${effect.slug}</p>
+    <p>${effect.type || 'neutral'} · target ${target} ${modifierSummary ? `· ${modifierSummary}` : ''}</p>
+    <p class="muted">${effect.description || 'No description'}</p>
+  `;
+  return effectEl;
 }
 
 function createAbilityCard(ability) {
@@ -49,6 +70,11 @@ async function refreshEffects() {
       opt.textContent = `${effect.name} (${effect.type})`;
       abilityEffectSelect.appendChild(opt);
     });
+  }
+
+  if (effectList) {
+    effectList.innerHTML = '';
+    effects.forEach((effect) => effectList.appendChild(createEffectCard(effect)));
   }
 }
 
@@ -128,6 +154,35 @@ addCardForm.addEventListener('submit', async (event) => {
     addCardForm.reset();
     refreshAbilities();
     refreshCatalog();
+  }
+});
+
+addEffectForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(addEffectForm);
+  const payload = {
+    slug: form.get('slug'),
+    name: form.get('name'),
+    type: form.get('type'),
+    targetHint: form.get('targetHint') || undefined,
+    description: form.get('description'),
+    duration: form.get('duration'),
+    staminaChange: form.get('staminaChange'),
+    damageBonusMin: form.get('damageBonusMin'),
+    damageBonusMax: form.get('damageBonusMax'),
+  };
+
+  const res = await fetch('/api/effects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  alert(data.message || 'Updated effects');
+  if (res.ok) {
+    addEffectForm.reset();
+    await refreshEffects();
   }
 });
 

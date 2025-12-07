@@ -15,6 +15,11 @@ const addEffectForm = document.getElementById('add-effect-form');
 const cardMode = document.getElementById('card-mode');
 const abilityMode = document.getElementById('ability-mode');
 const effectMode = document.getElementById('effect-mode');
+const effectTemplateSelect = document.getElementById('effect-template');
+const modifierFields = {
+  staminaChange: document.querySelector('[data-modifier="staminaChange"]'),
+  damageBonus: Array.from(document.querySelectorAll('[data-modifier="damageBonus"]')),
+};
 
 let abilities = [];
 let effects = [];
@@ -58,6 +63,45 @@ function createEffectCard(effect) {
   return effectEl;
 }
 
+function toggleModifierFields(effect) {
+  const showStamina = Boolean(effect?.modifiers?.staminaChange);
+  const showDamage = Boolean(effect?.modifiers?.damageBonus);
+
+  if (modifierFields.staminaChange) {
+    modifierFields.staminaChange.classList.toggle('hidden', !showStamina);
+    if (!showStamina) addEffectForm.staminaChange.value = '';
+  }
+
+  if (modifierFields.damageBonus?.length) {
+    modifierFields.damageBonus.forEach((field) => field.classList.toggle('hidden', !showDamage));
+    if (!showDamage) {
+      addEffectForm.damageBonusMin.value = '';
+      addEffectForm.damageBonusMax.value = '';
+    }
+  }
+}
+
+function applyEffectTemplate(effect) {
+  if (!effect) {
+    toggleModifierFields(null);
+    return;
+  }
+
+  addEffectForm.type.value = effect.type || 'neutral';
+  addEffectForm.targetHint.value = effect.targetHint || '';
+  addEffectForm.duration.value = effect.duration || '';
+  addEffectForm.description.value = effect.description || '';
+
+  if (!addEffectForm.name.value) addEffectForm.name.value = effect.name;
+  if (!addEffectForm.slug.value) addEffectForm.slug.value = `${effect.slug}-variant`;
+
+  addEffectForm.staminaChange.value = effect.modifiers?.staminaChange ?? '';
+  addEffectForm.damageBonusMin.value = effect.modifiers?.damageBonus?.min ?? '';
+  addEffectForm.damageBonusMax.value = effect.modifiers?.damageBonus?.max ?? '';
+
+  toggleModifierFields(effect);
+}
+
 function createAbilityCard(ability) {
   const abilityEl = document.createElement('div');
   abilityEl.className = 'card ability-card catalog-card';
@@ -92,6 +136,17 @@ async function refreshEffects() {
       opt.value = effect.slug;
       opt.textContent = `${effect.name} (${effect.type})`;
       abilityEffectSelect.appendChild(opt);
+    });
+  }
+
+  if (effectTemplateSelect) {
+    effectTemplateSelect.innerHTML = '<option value="">Select a base effect</option>';
+    const sorted = [...effects].sort((a, b) => a.name.localeCompare(b.name));
+    sorted.forEach((effect) => {
+      const opt = document.createElement('option');
+      opt.value = effect.slug;
+      opt.textContent = effect.name;
+      effectTemplateSelect.appendChild(opt);
     });
   }
 
@@ -168,6 +223,8 @@ function setModeLabel(modeEl, slug) {
   modeEl.textContent = slug ? `Editing ${slug}` : 'Create';
 }
 
+toggleModifierFields(null);
+
 addCardForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(addCardForm);
@@ -223,11 +280,20 @@ addEffectForm.addEventListener('submit', async (event) => {
   alert(data.message || 'Updated effects');
   if (res.ok) {
     addEffectForm.reset();
+    if (effectTemplateSelect) effectTemplateSelect.selectedIndex = 0;
     effectEditingSlug = null;
+    toggleModifierFields(null);
     setModeLabel(effectMode, null);
     await refreshEffects();
   }
 });
+
+if (effectTemplateSelect) {
+  effectTemplateSelect.addEventListener('change', () => {
+    const selected = effects.find((effect) => effect.slug === effectTemplateSelect.value);
+    applyEffectTemplate(selected);
+  });
+}
 
 addAbilityForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -275,6 +341,8 @@ addAbilityForm.addEventListener('reset', () => {
 
 addEffectForm.addEventListener('reset', () => {
   effectEditingSlug = null;
+  if (effectTemplateSelect) effectTemplateSelect.selectedIndex = 0;
+  toggleModifierFields(null);
   setModeLabel(effectMode, null);
 });
 
@@ -290,6 +358,12 @@ function populateEffectForm(effect) {
   addEffectForm.damageBonusMin.value = effect.modifiers?.damageBonus?.min ?? '';
   addEffectForm.damageBonusMax.value = effect.modifiers?.damageBonus?.max ?? '';
   addEffectForm.description.value = effect.description || '';
+
+  if (effectTemplateSelect) {
+    const match = Array.from(effectTemplateSelect.options).find((opt) => opt.value === effect.slug);
+    effectTemplateSelect.value = match ? effect.slug : '';
+  }
+  toggleModifierFields(effect);
 }
 
 function populateAbilityForm(ability) {

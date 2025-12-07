@@ -216,11 +216,29 @@ h1 {
 
 .pill {
   margin: 0;
-  padding: 4px 8px;
-  border: 1px solid var(--fg);
-  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  font-size: 10px;
   text-transform: uppercase;
   display: inline-block;
+  background: #0c0c0c;
+  letter-spacing: 0.5px;
+}
+
+.slug-label {
+  margin: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: #0a0a0a;
+  color: var(--muted);
+}
+
+.small-text {
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .stacked {
@@ -298,26 +316,30 @@ h1 {
 
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
 
 .card {
   border: 2px solid var(--border);
-  padding: 10px;
+  padding: 10px 12px;
   background: #0a0a0a;
 }
 
 .catalog-card {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.card-header.tight .label {
+  margin-bottom: 2px;
 }
 
 .card-header .label {
@@ -327,22 +349,34 @@ h1 {
 .card-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
 }
 
 .ability-row {
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .ability-card {
   border-color: #1f1f1f;
   background: #0c0c0c;
+  gap: 6px;
 }
 
 .ability-card .label {
-  font-size: 12px;
+  font-size: 13px;
 }
+
+.ability-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 
 .board-wrap {
   position: relative;

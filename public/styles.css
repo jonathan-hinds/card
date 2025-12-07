@@ -279,6 +279,9 @@ h1 {
   text-transform: uppercase;
   border: 2px solid #000;
   cursor: pointer;
+  white-space: nowrap;
+  font-size: clamp(10px, 1.8vw, 12px);
+  line-height: 1.1;
 }
 
 .cta:hover {
@@ -294,6 +297,9 @@ h1 {
   text-transform: uppercase;
   border: 2px solid var(--fg);
   cursor: pointer;
+  white-space: nowrap;
+  font-size: clamp(10px, 1.8vw, 12px);
+  line-height: 1.1;
 }
 
 .ghost.danger {
@@ -352,10 +358,11 @@ h1 {
 }
 
 .catalog-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
   gap: 10px;
   height: 100%;
+  min-height: 320px;
 }
 
 .card-header {
@@ -367,14 +374,26 @@ h1 {
   overflow: hidden;
 }
 
+.card-header > div,
+.card-header .slug-label {
+  min-width: 0;
+}
+
 .card-header.tight .label {
   margin-bottom: 2px;
 }
 
 .card-header .label {
   margin-bottom: 4px;
-  font-size: clamp(12px, 3vw, 16px);
+  font-size: clamp(11px, 2vw, 15px);
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-header .slug-label {
+  max-width: 120px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -389,8 +408,9 @@ h1 {
 .card-actions button {
   flex: 1;
   min-width: 0;
-  font-size: clamp(10px, 2.4vw, 12px);
+  font-size: clamp(10px, 2vw, 12px);
   white-space: nowrap;
+  line-height: 1.1;
 }
 
 .ability-row {
@@ -404,10 +424,32 @@ h1 {
   flex-direction: column;
   flex: 1;
   gap: 8px;
-  min-height: 60px;
-  max-height: 260px;
+  min-height: 150px;
+  max-height: 150px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) #050505;
+}
+
+.catalog-card .ability-row::-webkit-scrollbar {
+  width: 6px;
+}
+
+.catalog-card .ability-row::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+.catalog-card .ability-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+.catalog-card > .muted {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
 }
 
 .ability-card {
@@ -423,7 +465,7 @@ h1 {
 }
 
 .ability-card .label {
-  font-size: 13px;
+  font-size: clamp(11px, 2vw, 13px);
 }
 
 .ability-card .slug-label {
@@ -433,7 +475,11 @@ h1 {
 .ability-card .label,
 .ability-card .slug-label,
 .ability-card .muted {
-  word-break: break-word;
+  word-break: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  hyphens: none;
 }
 
 .ability-meta {

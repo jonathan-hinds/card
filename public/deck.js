@@ -1,4 +1,4 @@
-import { authHeaders, formatStats, requireProfile, wireLogout } from './common.js';
+import { authHeaders, formatStats, requireProfile, summarizeAbilities, wireLogout } from './common.js';
 
 const handSelect = document.getElementById('hand-card-select');
 const handList = document.getElementById('hand-list');
@@ -15,7 +15,8 @@ async function refreshCatalog() {
   data.cards.forEach((card) => {
     const option = document.createElement('option');
     option.value = card.slug;
-    option.textContent = `${card.name} — ${formatStats(card)}`;
+    const abilities = card.abilityDetails || [];
+    option.textContent = `${card.name} — ${formatStats(card)} — ${summarizeAbilities(abilities)}`;
     handSelect.appendChild(option);
   });
 }

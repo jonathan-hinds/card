@@ -71,11 +71,15 @@ async function seedAbilities(collection) {
     slug: 'basic-attack',
     name: 'Basic Attack',
     staminaCost: 1,
-    description: 'Strike a nearby foe using the unit\'s damage range.',
-    createdAt: new Date(),
+    damage: { min: 1, max: 3 },
+    description: 'Strike a nearby foe using the unit\'s basic training.',
   };
 
-  await collection.updateOne({ slug: basicAttack.slug }, { $setOnInsert: basicAttack }, { upsert: true });
+  await collection.updateOne(
+    { slug: basicAttack.slug },
+    { $set: { ...basicAttack }, $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
 }
 
 async function seedCards(collection) {
@@ -84,15 +88,17 @@ async function seedCards(collection) {
     name: 'Grunt',
     stats: {
       health: 10,
-      damage: { min: 1, max: 3 },
       stamina: 3,
       speed: 1,
       attackRange: 1,
     },
     abilities: ['basic-attack'],
-    createdAt: new Date(),
   };
-  await collection.updateOne({ slug: grunt.slug }, { $setOnInsert: grunt }, { upsert: true });
+  await collection.updateOne(
+    { slug: grunt.slug },
+    { $set: { ...grunt }, $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
 }
 
 function requireAuth(req, res, next) {
@@ -259,11 +265,63 @@ app.get('/api/profile', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/abilities', async (_req, res) => {
+  try {
+    const { abilitiesCollection: collection } = await ensureDatabase();
+    const abilities = await collection.find({}).sort({ name: 1 }).toArray();
+    res.json({ abilities });
+  } catch (error) {
+    console.error('Ability catalog load error:', error);
+    res.status(500).json({ message: 'Failed to load abilities.' });
+  }
+});
+
+app.post('/api/abilities', async (req, res) => {
+  const ability = req.body || {};
+  if (!ability.slug || !ability.name || typeof ability.staminaCost === 'undefined') {
+    return res.status(400).json({ message: 'Ability requires slug, name, and stamina cost.' });
+  }
+
+  const damageMin = Number(ability?.damage?.min ?? 0);
+  const damageMax = Number(ability?.damage?.max ?? 0);
+
+  if (Number.isNaN(damageMin) || Number.isNaN(damageMax) || damageMin > damageMax) {
+    return res.status(400).json({ message: 'Damage requires valid min and max values.' });
+  }
+
+  try {
+    const { abilitiesCollection: collection } = await ensureDatabase();
+    await collection.insertOne({
+      ...ability,
+      damage: { min: damageMin, max: damageMax },
+      staminaCost: Number(ability.staminaCost),
+      createdAt: new Date(),
+    });
+    res.status(201).json({ message: 'Ability added.' });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Ability slug already exists.' });
+    }
+    console.error('Ability insert error:', error);
+    res.status(500).json({ message: 'Failed to add ability.' });
+  }
+});
+
 app.get('/api/cards', async (_req, res) => {
   try {
-    const { cardsCollection: collection } = await ensureDatabase();
-    const cards = await collection.find({}).sort({ name: 1 }).toArray();
-    res.json({ cards });
+    const { cardsCollection, abilitiesCollection } = await ensureDatabase();
+    const [cards, abilities] = await Promise.all([
+      cardsCollection.find({}).sort({ name: 1 }).toArray(),
+      abilitiesCollection.find({}).toArray(),
+    ]);
+    const abilityMap = new Map(abilities.map((ability) => [ability.slug, ability]));
+    const enriched = cards.map((card) => ({
+      ...card,
+      abilityDetails: (card.abilities || [])
+        .map((slug) => (typeof slug === 'string' ? abilityMap.get(slug) : slug))
+        .filter(Boolean),
+    }));
+    res.json({ cards: enriched, abilities });
   } catch (error) {
     console.error('Card catalog load error:', error);
     res.status(500).json({ message: 'Failed to load card catalog.' });
@@ -473,7 +531,6 @@ async function buildUnit(card, owner) {
     staminaMax: card.stats.stamina,
     speed: card.stats.speed,
     attackRange: card.stats.attackRange,
-    damage: card.stats.damage,
     abilities: abilitySlugs,
     summoningSickness: true,
   };
@@ -586,7 +643,9 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       throw Object.assign(new Error('Not enough stamina.'), { status: 400 });
     }
 
-    const roll = Math.floor(Math.random() * (attacker.damage.max - attacker.damage.min + 1)) + attacker.damage.min;
+    const damageMin = ability?.damage?.min ?? 0;
+    const damageMax = ability?.damage?.max ?? damageMin;
+    const roll = Math.floor(Math.random() * (damageMax - damageMin + 1)) + damageMin;
     defender.health -= roll;
     attacker.stamina -= ability.staminaCost;
     match.log.push(`${req.player}'s ${attacker.name} used ${ability.name} for ${roll} damage.`);

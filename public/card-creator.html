@@ -41,12 +41,30 @@
           <input type="text" name="slug" placeholder="slug" required />
           <input type="text" name="name" placeholder="name" required />
           <input type="number" name="health" placeholder="health" min="1" required />
-          <input type="number" name="min" placeholder="min dmg" min="0" required />
-          <input type="number" name="max" placeholder="max dmg" min="0" required />
           <input type="number" name="stamina" placeholder="stamina" min="1" required />
           <input type="number" name="speed" placeholder="speed" min="0" required />
           <input type="number" name="range" placeholder="range" min="0" required />
+          <select name="ability" id="card-ability" required>
+            <option value="">Select ability</option>
+          </select>
           <button class="cta" type="submit">Add Card</button>
+        </form>
+      </section>
+
+      <section class="deck-block">
+        <div class="section-title">
+          <p class="label">Ability catalog</p>
+          <p class="muted">Reusable abilities assigned to cards.</p>
+        </div>
+        <div class="catalog-grid" id="ability-list"></div>
+        <form class="inline-form" id="add-ability-form">
+          <input type="text" name="slug" placeholder="slug" required />
+          <input type="text" name="name" placeholder="name" required />
+          <input type="number" name="min" placeholder="min dmg" min="0" required />
+          <input type="number" name="max" placeholder="max dmg" min="0" required />
+          <input type="number" name="staminaCost" placeholder="stamina cost" min="0" required />
+          <input type="text" name="description" placeholder="description" />
+          <button class="cta" type="submit">Add Ability</button>
         </form>
       </section>
     </main>

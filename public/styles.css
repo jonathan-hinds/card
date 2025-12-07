@@ -259,6 +259,21 @@ h1 {
   background: #0a0a0a;
 }
 
+.ability-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ability-card {
+  border-color: #1f1f1f;
+  background: #0c0c0c;
+}
+
+.ability-card .label {
+  font-size: 12px;
+}
+
 .board {
   display: grid;
   gap: 6px;

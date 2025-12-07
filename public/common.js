@@ -66,5 +66,16 @@ export function wireLogout(button) {
 }
 
 export function formatStats(card) {
-  return `HP ${card.stats.health} · DMG ${card.stats.damage.min}-${card.stats.damage.max} · Sta ${card.stats.stamina} · Spd ${card.stats.speed} · RNG ${card.stats.attackRange}`;
+  return `HP ${card.stats.health} · Sta ${card.stats.stamina} · Spd ${card.stats.speed} · RNG ${card.stats.attackRange}`;
+}
+
+export function formatAbility(ability) {
+  if (!ability) return 'Unknown ability';
+  const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
+  return `${ability.name} · DMG ${damage} · Cost ${ability.staminaCost} STA`;
+}
+
+export function summarizeAbilities(abilities = []) {
+  if (!abilities.length) return 'No abilities assigned';
+  return abilities.map((ability) => formatAbility(ability)).join(' | ');
 }

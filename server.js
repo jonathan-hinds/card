@@ -131,12 +131,16 @@ function createEmptyBoard() {
 }
 
 function canMovePiece(piece, from, to) {
-  const distance = Math.abs(from.row - to.row) + Math.abs(from.col - to.col);
+  const rowDiff = Math.abs(from.row - to.row);
+  const colDiff = Math.abs(from.col - to.col);
+  const distance = Math.max(rowDiff, colDiff);
   return distance <= piece.speed;
 }
 
 function withinRange(attacker, from, to) {
-  const distance = Math.abs(from.row - to.row) + Math.abs(from.col - to.col);
+  const rowDiff = Math.abs(from.row - to.row);
+  const colDiff = Math.abs(from.col - to.col);
+  const distance = Math.max(rowDiff, colDiff);
   return distance <= attacker.attackRange;
 }
 

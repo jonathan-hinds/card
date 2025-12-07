@@ -1,4 +1,4 @@
-import { formatAbility, formatStats, requireProfile, summarizeAbilities, wireLogout } from './common.js';
+import { formatAbility, requireProfile, summarizeAbilities, wireLogout } from './common.js';
 
 const catalogList = document.getElementById('catalog-list');
 const addCardForm = document.getElementById('add-card-form');
@@ -48,9 +48,11 @@ function createEffectCard(effect) {
     <div class="card-header">
       <div>
         <p class="label">${effect.name}</p>
-        <p class="muted">${effect.type || 'neutral'} · Target ${target}</p>
+        <div class="tag-column">
+          <p class="slug-label">${effect.type || 'neutral'}</p>
+          <p class="slug-label">Target ${target}</p>
+        </div>
       </div>
-      <p class="slug-label">${effect.slug}</p>
     </div>
     <p>${modifierSummary || 'No modifiers'}</p>
     <p class="muted">${effect.description || 'No description'}</p>
@@ -75,7 +77,6 @@ function createAbilityCard(ability, { showActions = true, compact = false } = {}
         <p class="label">${ability.name}</p>
         <p class="muted small-text ability-description">${ability.description || 'No description'}</p>
       </div>
-      <p class="slug-label">${ability.slug}</p>
     </div>
     <div class="ability-meta">
       <span>Target ${ability.targetType || 'enemy'}</span>
@@ -195,9 +196,12 @@ async function refreshCatalog() {
       <div class="card-header">
         <div>
           <p class="label">${card.name}</p>
-          <p class="muted">${formatStats(card)}</p>
+          <div class="tag-column">
+            <p class="slug-label">HP ${card.stats?.health ?? '—'}</p>
+            <p class="slug-label">STA ${card.stats?.stamina ?? '—'}</p>
+            <p class="slug-label">SPD ${card.stats?.speed ?? '—'}</p>
+          </div>
         </div>
-        <p class="slug-label">${card.slug}</p>
       </div>
       <p class="muted">Abilities: ${cardAbilities.map((ability) => ability?.name).filter(Boolean).join(', ') || 'None'}</p>
     `;

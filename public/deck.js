@@ -11,16 +11,29 @@ const catalogGrid = document.getElementById('catalog-grid');
 
 let catalog = [];
 
+function createStatTags(stats) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tag-column';
+  ['health', 'stamina', 'speed'].forEach((key) => {
+    const label = document.createElement('p');
+    label.className = 'slug-label';
+    const prefix = key === 'health' ? 'HP' : key === 'stamina' ? 'STA' : 'SPD';
+    const value = stats?.[key] ?? '—';
+    label.textContent = `${prefix} ${value}`;
+    wrapper.appendChild(label);
+  });
+  return wrapper;
+}
+
 function createCardTile(card, withControls = false) {
   const abilities = card.abilityDetails || [];
   const tile = document.createElement('div');
   tile.className = 'card';
   tile.innerHTML = `
     <p class="label">${card.name}</p>
-    <p class="muted">slug: ${card.slug}</p>
-    <p>${formatStats(card)}</p>
     <p class="muted">Abilities: ${summarizeAbilities(abilities)}</p>
   `;
+  tile.insertBefore(createStatTags(card.stats), tile.querySelector('.muted'));
 
   if (withControls) {
     const controls = document.createElement('div');

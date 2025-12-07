@@ -161,7 +161,9 @@ function calculateMoves(piece, position) {
   const spaces = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const distance = Math.abs(position.row - r) + Math.abs(position.col - c);
+      const rowDiff = Math.abs(position.row - r);
+      const colDiff = Math.abs(position.col - c);
+      const distance = Math.max(rowDiff, colDiff);
       if (distance === 0 || distance > piece.speed) continue;
       if (activeMatch.board[r][c]) continue;
       spaces.push({ row: r, col: c });
@@ -176,7 +178,9 @@ function calculateTargets(piece, position) {
   const targets = [];
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const distance = Math.abs(position.row - r) + Math.abs(position.col - c);
+      const rowDiff = Math.abs(position.row - r);
+      const colDiff = Math.abs(position.col - c);
+      const distance = Math.max(rowDiff, colDiff);
       if (distance === 0 || distance > piece.attackRange) continue;
       range.push({ row: r, col: c });
       const occupant = activeMatch.board[r][c];

@@ -51,10 +51,14 @@
             <label class="field">Health<input type="number" name="health" min="1" required /></label>
             <label class="field">Stamina<input type="number" name="stamina" min="1" required /></label>
             <label class="field">Speed<input type="number" name="speed" min="0" required /></label>
-            <label class="field span-2">Ability
-              <select name="ability" id="card-ability" required>
-                <option value="">Select ability</option>
-              </select>
+            <label class="field span-2">Abilities
+              <div class="ability-selector">
+                <select name="ability" id="card-ability">
+                  <option value="">Select ability</option>
+                </select>
+                <button class="ghost" type="button" id="add-card-ability">Add</button>
+              </div>
+              <div class="pill-row" id="card-ability-list"></div>
             </label>
           </div>
           <div class="form-actions">

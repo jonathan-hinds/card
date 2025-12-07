@@ -18,8 +18,8 @@ const overlay = document.getElementById('action-overlay');
 const overlayName = document.getElementById('selected-name');
 const overlayStats = document.getElementById('selected-stats');
 const moveBtn = document.getElementById('overlay-move');
-const attackBtn = document.getElementById('overlay-attack');
 const cancelBtn = document.getElementById('cancel-action');
+const overlayAbilities = document.getElementById('overlay-abilities');
 const sideSelector = document.getElementById('side-selector');
 
 let activeMatch = null;
@@ -27,10 +27,18 @@ let controllerName = '';
 let currentSide = '';
 let selectedHandSlug = '';
 let selectedUnit = null;
-let currentMode = null; // place | move | attack | null
+let currentMode = null; // place | move | ability | null
+let currentAbilitySlug = '';
 const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
+
+function getAbilityRangeValue(ability) {
+  if (!ability) return null;
+  if (Number.isFinite(ability.range)) return ability.range;
+  if (Number.isFinite(ability.attackRange)) return ability.attackRange;
+  return null;
+}
 
 function sideAwareHeaders(extra = {}) {
   const headers = { ...authHeaders(), ...extra };
@@ -41,11 +49,7 @@ function sideAwareHeaders(extra = {}) {
 function getPrimaryAbility(piece) {
   if (piece?.abilityDetails?.length) {
     const ability = piece.abilityDetails[0];
-    const attackRange = Number.isFinite(ability.range)
-      ? ability.range
-      : Number.isFinite(ability.attackRange)
-        ? ability.attackRange
-        : 1;
+    const attackRange = getAbilityRangeValue(ability) ?? 1;
     return {
       title: ability.name || ability.slug || 'Ability',
       cost: Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '',
@@ -209,6 +213,77 @@ function describePiece(piece) {
   return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}`;
 }
 
+function buildAbilityMeta(ability) {
+  const parts = [];
+  if (Number.isFinite(ability.staminaCost)) parts.push(`Cost ${ability.staminaCost} STA`);
+  if (ability.damage) parts.push(`DMG ${ability.damage.min}-${ability.damage.max}`);
+  const range = getAbilityRangeValue(ability);
+  if (Number.isFinite(range)) parts.push(`RNG ${range}`);
+  if (ability.targetType) parts.push(`Target ${ability.targetType}`);
+  return parts.join(' · ');
+}
+
+function renderAbilityActions(piece) {
+  if (!overlayAbilities) return;
+  overlayAbilities.innerHTML = '';
+  const abilities = piece?.abilityDetails || [];
+  const notYourTurn = activeMatch?.turn !== currentSide;
+
+  if (!abilities.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted small-text';
+    empty.textContent = 'No abilities available';
+    overlayAbilities.appendChild(empty);
+    return;
+  }
+
+  abilities.forEach((ability) => {
+    const abilityBtn = document.createElement('button');
+    abilityBtn.type = 'button';
+    abilityBtn.className = 'ability-action';
+    abilityBtn.dataset.ability = ability.slug;
+    abilityBtn.disabled = piece.summoningSickness || piece.stamina < ability.staminaCost || notYourTurn;
+    abilityBtn.classList.toggle('active', currentAbilitySlug === ability.slug && currentMode === 'ability');
+
+    const header = document.createElement('div');
+    header.className = 'ability-action__header';
+    const title = document.createElement('span');
+    title.className = 'ability-action__name';
+    title.textContent = ability.name || ability.slug || 'Ability';
+    const cost = document.createElement('span');
+    cost.className = 'ability-action__cost';
+    cost.textContent = Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '—';
+    header.append(title, cost);
+
+    const meta = document.createElement('div');
+    meta.className = 'ability-action__meta';
+    meta.textContent = buildAbilityMeta(ability);
+
+    const desc = document.createElement('p');
+    desc.className = 'muted small-text ability-action__desc';
+    desc.textContent = ability.description || '—';
+
+    abilityBtn.append(header, meta, desc);
+    abilityBtn.addEventListener('click', () => startAbilityTargeting(piece, ability));
+    overlayAbilities.appendChild(abilityBtn);
+  });
+}
+
+function startAbilityTargeting(piece, ability) {
+  if (!piece || !ability) return;
+  const { range, targets } = calculateTargets(piece, selectedUnit, ability);
+  resetHighlights();
+  range.forEach((space) => highlights.range.add(coordKey(space.row, space.col)));
+  targets.forEach((space) => highlights.targets.add(coordKey(space.row, space.col)));
+  currentMode = 'ability';
+  currentAbilitySlug = ability.slug;
+  renderBoard(activeMatch.board);
+  renderAbilityActions(piece);
+  metaEl.textContent = targets.length
+    ? `Select a target for ${ability.name}.`
+    : `No valid targets in range for ${ability.name}.`;
+}
+
 function updateOverlay() {
   if (!selectedUnit || !activeMatch) {
     overlay.classList.add('hidden');
@@ -219,6 +294,7 @@ function updateOverlay() {
     overlay.classList.add('hidden');
     selectedUnit = null;
     currentMode = null;
+    currentAbilitySlug = '';
     resetHighlights();
     return;
   }
@@ -228,7 +304,7 @@ function updateOverlay() {
 
   const notYourTurn = activeMatch.turn !== currentSide;
   moveBtn.disabled = piece.summoningSickness || piece.stamina <= 0 || notYourTurn;
-  attackBtn.disabled = piece.summoningSickness || piece.stamina <= 0 || notYourTurn;
+  renderAbilityActions(piece);
 }
 
 function updateSideSelector(match) {
@@ -293,17 +369,16 @@ function calculateMoves(piece, position) {
   return spaces;
 }
 
-function calculateTargets(piece, position) {
+function calculateTargets(piece, position, abilityOverride = null) {
   const { rows, cols } = boardSize();
   const range = [];
   const targets = [];
-  const ability = piece?.abilityDetails?.[0];
-  const abilityRange = Number.isFinite(ability?.range)
-    ? ability.range
-    : Number.isFinite(ability?.attackRange)
-      ? ability.attackRange
-      : 1;
+  const ability = abilityOverride || piece?.abilityDetails?.[0];
+  const abilityRange = getAbilityRangeValue(ability) ?? 1;
   const targetType = ability?.targetType || 'enemy';
+
+  if (!ability) return { range, targets };
+
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
       const rowDiff = Math.abs(position.row - r);
@@ -325,10 +400,11 @@ function selectUnit(row, col) {
   selectedUnit = { row, col };
   selectedHandSlug = '';
   currentMode = null;
+  currentAbilitySlug = '';
   resetHighlights();
   updateOverlay();
   renderBoard(activeMatch.board);
-  metaEl.textContent = 'Choose Move or Attack to act with this unit.';
+  metaEl.textContent = 'Choose Move or an ability to act with this unit.';
 }
 
 async function placeCard(row, col) {
@@ -367,10 +443,11 @@ async function moveCard(toRow, toCol) {
   metaEl.textContent = data.message || (res.ok ? 'Moved.' : 'Move failed.');
 }
 
-async function attackTarget(targetRow, targetCol) {
+async function attackTarget(targetRow, targetCol, abilitySlug = '') {
   if (!selectedUnit) return;
   const origin = { ...selectedUnit };
   const payload = { fromRow: selectedUnit.row, fromCol: selectedUnit.col, targetRow, targetCol };
+  if (abilitySlug) payload.abilitySlug = abilitySlug;
   const res = await fetch(`/api/matches/${activeMatch.id}/attack`, {
     method: 'POST',
     headers: sideAwareHeaders({ 'Content-Type': 'application/json' }),
@@ -379,6 +456,7 @@ async function attackTarget(targetRow, targetCol) {
   const data = await res.json();
   if (res.ok) {
     currentMode = null;
+    currentAbilitySlug = '';
     resetHighlights();
     renderMatch(data.match);
     selectUnit(origin.row, origin.col);
@@ -405,8 +483,8 @@ boardEl.addEventListener('click', (event) => {
     return;
   }
 
-  if (currentMode === 'attack' && highlights.targets.has(key)) {
-    attackTarget(row, col);
+  if (currentMode === 'ability' && highlights.targets.has(key)) {
+    attackTarget(row, col, currentAbilitySlug);
     return;
   }
 
@@ -422,28 +500,16 @@ moveBtn.addEventListener('click', () => {
   resetHighlights();
   spaces.forEach((space) => highlights.moves.add(coordKey(space.row, space.col)));
   currentMode = 'move';
+  currentAbilitySlug = '';
   renderBoard(activeMatch.board);
   metaEl.textContent = spaces.length ? 'Choose a highlighted tile to move.' : 'No reachable tiles.';
-});
-
-attackBtn.addEventListener('click', () => {
-  if (!selectedUnit) return;
-  const piece = activeMatch.board[selectedUnit.row][selectedUnit.col];
-  const { range, targets } = calculateTargets(piece, selectedUnit);
-  resetHighlights();
-  range.forEach((space) => highlights.range.add(coordKey(space.row, space.col)));
-  targets.forEach((space) => highlights.targets.add(coordKey(space.row, space.col)));
-  currentMode = 'attack';
-  renderBoard(activeMatch.board);
-  metaEl.textContent = targets.length
-    ? 'Select a striped tile to target.'
-    : 'No valid targets in range.';
 });
 
 cancelBtn.addEventListener('click', () => {
   selectedHandSlug = '';
   selectedUnit = null;
   currentMode = null;
+  currentAbilitySlug = '';
   resetHighlights();
   overlay.classList.add('hidden');
   renderBoard(activeMatch.board);

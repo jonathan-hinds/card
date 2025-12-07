@@ -20,15 +20,23 @@ const overlayStats = document.getElementById('selected-stats');
 const moveBtn = document.getElementById('overlay-move');
 const attackBtn = document.getElementById('overlay-attack');
 const cancelBtn = document.getElementById('cancel-action');
+const sideSelector = document.getElementById('side-selector');
 
 let activeMatch = null;
-let playerName = '';
+let controllerName = '';
+let currentSide = '';
 let selectedHandSlug = '';
 let selectedUnit = null;
 let currentMode = null; // place | move | attack | null
 const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
+
+function sideAwareHeaders(extra = {}) {
+  const headers = { ...authHeaders(), ...extra };
+  if (currentSide) headers['X-Player-Role'] = currentSide;
+  return headers;
+}
 
 function getPrimaryAbility(piece) {
   if (piece?.abilityDetails?.length) {
@@ -73,7 +81,7 @@ function renderBoard(board) {
       }
 
       if (cell) {
-        cellEl.classList.add(cell.owner === playerName ? 'owned' : 'enemy');
+        cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
         const ability = getPrimaryAbility(cell);
         const cardEl = document.createElement('div');
         cardEl.className = 'unit-card';
@@ -171,7 +179,7 @@ function updateOverlay() {
     return;
   }
   const piece = activeMatch.board?.[selectedUnit.row]?.[selectedUnit.col];
-  if (!piece || piece.owner !== playerName) {
+  if (!piece || piece.owner !== currentSide) {
     overlay.classList.add('hidden');
     selectedUnit = null;
     currentMode = null;
@@ -182,29 +190,48 @@ function updateOverlay() {
   overlayStats.textContent = describePiece(piece);
   overlay.classList.remove('hidden');
 
-  const notYourTurn = activeMatch.turn !== playerName;
+  const notYourTurn = activeMatch.turn !== currentSide;
   moveBtn.disabled = piece.summoningSickness || piece.stamina <= 0 || notYourTurn;
   attackBtn.disabled = piece.summoningSickness || piece.stamina <= 0 || notYourTurn;
 }
 
-function renderMatch(match, username) {
-  playerName = username;
+function updateSideSelector(match) {
+  const controllers = match.controllers || {};
+  const options = match.players.filter((player) => (controllers[player] || player) === controllerName);
+  sideSelector.innerHTML = '';
+  options.forEach((player) => {
+    const option = document.createElement('option');
+    option.value = player;
+    option.textContent = player;
+    sideSelector.appendChild(option);
+  });
+  if (options.includes(match.turn) && controllers[match.turn] === controllerName) {
+    currentSide = match.turn;
+  }
+  if (options.length && !options.includes(currentSide)) {
+    currentSide = options[0];
+  }
+  sideSelector.value = currentSide || '';
+}
+
+function renderMatch(match) {
   activeMatch = match;
+  updateSideSelector(match);
   renderBoard(match.board);
   renderLog(match.log);
   turnIndicator.textContent = match.turn;
-  const hand = match.hands ? match.hands[username] || [] : [];
+  const hand = match.hands ? match.hands[currentSide] || [] : [];
   renderHand(hand);
   updateOverlay();
 }
 
-async function syncMatch(username) {
+async function syncMatch() {
   const matchId = getActiveMatch();
   if (!matchId) return;
-  const res = await fetch(`/api/matches/${matchId}`, { headers: { ...authHeaders() } });
+  const res = await fetch(`/api/matches/${matchId}`, { headers: sideAwareHeaders() });
   const data = await res.json();
   if (res.ok && data.match) {
-    renderMatch(data.match, username);
+    renderMatch(data.match);
   }
 }
 
@@ -265,7 +292,7 @@ async function placeCard(row, col) {
   const payload = { cardSlug: selectedHandSlug, row, col };
   const res = await fetch(`/api/matches/${activeMatch.id}/place`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: sideAwareHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   const data = await res.json();
@@ -273,7 +300,7 @@ async function placeCard(row, col) {
     selectedHandSlug = '';
     currentMode = null;
     resetHighlights();
-    renderMatch(data.match, playerName);
+    renderMatch(data.match);
   }
   metaEl.textContent = data.message || (res.ok ? 'Deployed.' : 'Deploy failed.');
 }
@@ -283,14 +310,14 @@ async function moveCard(toRow, toCol) {
   const payload = { fromRow: selectedUnit.row, fromCol: selectedUnit.col, toRow, toCol };
   const res = await fetch(`/api/matches/${activeMatch.id}/move`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: sideAwareHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (res.ok) {
     currentMode = null;
     resetHighlights();
-    renderMatch(data.match, playerName);
+    renderMatch(data.match);
     selectUnit(toRow, toCol);
   }
   metaEl.textContent = data.message || (res.ok ? 'Moved.' : 'Move failed.');
@@ -302,14 +329,14 @@ async function attackTarget(targetRow, targetCol) {
   const payload = { fromRow: selectedUnit.row, fromCol: selectedUnit.col, targetRow, targetCol };
   const res = await fetch(`/api/matches/${activeMatch.id}/attack`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: sideAwareHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (res.ok) {
     currentMode = null;
     resetHighlights();
-    renderMatch(data.match, playerName);
+    renderMatch(data.match);
     selectUnit(origin.row, origin.col);
   }
   metaEl.textContent = data.message || (res.ok ? 'Attack resolved.' : 'Attack failed.');
@@ -339,7 +366,7 @@ boardEl.addEventListener('click', (event) => {
     return;
   }
 
-  if (cell && cell.owner === playerName) {
+  if (cell && cell.owner === currentSide) {
     selectUnit(row, col);
   }
 });
@@ -379,18 +406,29 @@ cancelBtn.addEventListener('click', () => {
   metaEl.textContent = 'Action cancelled.';
 });
 
+sideSelector.addEventListener('change', () => {
+  currentSide = sideSelector.value;
+  selectedHandSlug = '';
+  selectedUnit = null;
+  currentMode = null;
+  resetHighlights();
+  metaEl.textContent = `Viewing as ${currentSide}.`;
+  syncMatch();
+});
+
 endTurnBtn.addEventListener('click', async () => {
   if (!activeMatch) return;
-  const res = await fetch(`/api/matches/${activeMatch.id}/end-turn`, { method: 'POST', headers: { ...authHeaders() } });
+  const res = await fetch(`/api/matches/${activeMatch.id}/end-turn`, { method: 'POST', headers: sideAwareHeaders() });
   const data = await res.json();
-  if (res.ok) renderMatch(data.match, nameEl.textContent);
+  if (res.ok) renderMatch(data.match);
   metaEl.textContent = data.message || 'Turn ended';
 });
 
 async function init() {
   const profile = await requireProfile();
   if (!profile) return;
-  playerName = profile.username;
+  controllerName = profile.username;
+  currentSide = profile.username;
   nameEl.textContent = profile.username;
   metaEl.textContent = 'Waiting for match data…';
 
@@ -398,12 +436,12 @@ async function init() {
   const data = await res.json();
   if (data.match) {
     setActiveMatch(data.match.id);
-    renderMatch(data.match, profile.username);
+    renderMatch(data.match);
   } else {
     metaEl.textContent = 'No active match. Return to matchmaking.';
   }
 
-  setInterval(() => syncMatch(profile.username), 4000);
+  setInterval(() => syncMatch(), 4000);
 }
 
 wireLogout(logoutBtn);

@@ -178,6 +178,8 @@ function summarizeMatch(match, viewer) {
   const view = {
     id: match.id,
     players: match.players,
+    controllers: defaultControllers(match),
+    mode: match.mode || 'versus',
     turn: match.turn,
     board: match.board,
     boardSize: gameConfig.board,
@@ -494,6 +496,7 @@ app.post('/api/matchmaking/join', requireAuth, async (req, res) => {
       const match = {
         id: matchId,
         players: [p1, p2],
+        controllers: { [p1]: p1, [p2]: p2 },
         hands,
         board: createEmptyBoard(),
         turn: p1,
@@ -520,11 +523,79 @@ app.post('/api/matchmaking/leave', requireAuth, (req, res) => {
   res.json({ message: 'Queue left.' });
 });
 
+app.post('/api/practice/start', requireAuth, async (req, res) => {
+  try {
+    const existing = findMatchForPlayer(req.player);
+    if (existing && existing.mode === 'practice') {
+      return res.json({ message: 'Practice match already active.', match: summarizeMatch(existing, req.player) });
+    }
+    if (existing && existing.mode !== 'practice') {
+      return res.status(400).json({ message: 'Finish your current match before starting practice.' });
+    }
+
+    const queueIndex = matchmakingQueue.findIndex((entry) => entry === req.player);
+    if (queueIndex !== -1) matchmakingQueue.splice(queueIndex, 1);
+
+    const player = await loadPlayer(req.player);
+    if (!player) return res.status(404).json({ message: 'Player not found.' });
+    const totalCards = (player.hand || []).reduce((sum, entry) => sum + entry.count, 0);
+    if (totalCards === 0) {
+      return res.status(400).json({ message: 'Add cards to your hand before starting practice.' });
+    }
+
+    const matchId = crypto.randomUUID();
+    const sparringPartner = `${req.player}-sparring`;
+    const hands = {
+      [req.player]: JSON.parse(JSON.stringify(player.hand)),
+      [sparringPartner]: JSON.parse(JSON.stringify(player.hand)),
+    };
+
+    const match = {
+      id: matchId,
+      players: [req.player, sparringPartner],
+      controllers: { [req.player]: req.player, [sparringPartner]: req.player },
+      mode: 'practice',
+      hands,
+      board: createEmptyBoard(),
+      turn: req.player,
+      turnPlays: 0,
+      status: 'active',
+      log: [`Practice match ${matchId} created for ${req.player}.`],
+      defeated: null,
+    };
+    match.boardPieces = { [req.player]: 0, [sparringPartner]: 0 };
+
+    matches.set(matchId, match);
+    res.status(201).json({ message: 'Practice match ready.', match: summarizeMatch(match, req.player) });
+  } catch (error) {
+    console.error('Practice start error:', error.message);
+    res.status(500).json({ message: 'Failed to start practice match.' });
+  }
+});
+
 function findMatchForPlayer(player) {
   for (const match of matches.values()) {
     if (match.players.includes(player)) return match;
   }
   return null;
+}
+
+function defaultControllers(match) {
+  if (match.controllers) return match.controllers;
+  const controllers = {};
+  match.players.forEach((player) => {
+    controllers[player] = player;
+  });
+  match.controllers = controllers;
+  return controllers;
+}
+
+function resolveActingPlayer(match, controller, requested) {
+  const controllers = defaultControllers(match);
+  const desired = requested || controller;
+  if (!match.players.includes(desired)) return null;
+  if (controllers[desired] !== controller) return null;
+  return desired;
 }
 
 app.get('/api/matchmaking/status', requireAuth, (req, res) => {
@@ -594,37 +665,39 @@ async function buildUnit(card, owner) {
 app.get('/api/matches/:id', requireAuth, (req, res) => {
   const match = matches.get(req.params.id);
   if (!match) return res.status(404).json({ message: 'Match not found.' });
-  if (!match.players.includes(req.player)) return res.status(403).json({ message: 'Not a participant.' });
-  res.json({ match: summarizeMatch(match, req.player) });
+  const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+  if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
+  res.json({ match: summarizeMatch(match, actingPlayer) });
 });
 
 app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
-    if (!match.players.includes(req.player)) return res.status(403).json({ message: 'Not a participant.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
-    ensureTurn(match, req.player);
+    ensureTurn(match, actingPlayer);
 
     const { row, col, cardSlug } = req.body || {};
     assertCell(match, row, col);
     if (match.board[row][col]) throw Object.assign(new Error('Cell occupied.'), { status: 400 });
     if (match.turnPlays >= 1) throw Object.assign(new Error('Only one card can be played each turn.'), { status: 400 });
 
-    const hand = match.hands[req.player] || [];
+    const hand = match.hands[actingPlayer] || [];
     const didDraw = drawCardFromHand(hand, cardSlug);
     if (!didDraw) throw Object.assign(new Error('Card not in hand.'), { status: 400 });
 
     const card = await getCardBySlug(cardSlug);
     if (!card) throw Object.assign(new Error('Card data missing.'), { status: 404 });
-    const unit = await buildUnit(card, req.player);
+    const unit = await buildUnit(card, actingPlayer);
 
     match.board[row][col] = unit;
     match.turnPlays += 1;
-    match.boardPieces[req.player] += 1;
-    match.log.push(`${req.player} deployed ${card.name} to (${row},${col}).`);
+    match.boardPieces[actingPlayer] += 1;
+    match.log.push(`${actingPlayer} deployed ${card.name} to (${row},${col}).`);
 
-    res.json({ match: summarizeMatch(match, req.player) });
+    res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('Place error:', error.message);
     res.status(error.status || 500).json({ message: error.message || 'Failed to place card.' });
@@ -635,15 +708,16 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
-    if (!match.players.includes(req.player)) return res.status(403).json({ message: 'Not a participant.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
-    ensureTurn(match, req.player);
+    ensureTurn(match, actingPlayer);
 
     const { fromRow, fromCol, toRow, toCol } = req.body || {};
     assertCell(match, fromRow, fromCol);
     assertCell(match, toRow, toCol);
     const piece = match.board[fromRow][fromCol];
-    if (!piece || piece.owner !== req.player) throw Object.assign(new Error('No piece to move.'), { status: 400 });
+    if (!piece || piece.owner !== actingPlayer) throw Object.assign(new Error('No piece to move.'), { status: 400 });
     if (piece.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
     if (piece.stamina <= 0) throw Object.assign(new Error('No stamina left to move.'), { status: 400 });
     if (!canMovePiece(piece, { row: fromRow, col: fromCol }, { row: toRow, col: toCol })) {
@@ -654,9 +728,9 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
     match.board[toRow][toCol] = piece;
     match.board[fromRow][fromCol] = null;
     piece.stamina -= 1;
-    match.log.push(`${req.player} moved ${piece.name} to (${toRow},${toCol}).`);
+    match.log.push(`${actingPlayer} moved ${piece.name} to (${toRow},${toCol}).`);
 
-    res.json({ match: summarizeMatch(match, req.player) });
+    res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('Move error:', error.message);
     res.status(error.status || 500).json({ message: error.message || 'Failed to move piece.' });
@@ -667,9 +741,10 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
-    if (!match.players.includes(req.player)) return res.status(403).json({ message: 'Not a participant.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
-    ensureTurn(match, req.player);
+    ensureTurn(match, actingPlayer);
 
     const { fromRow, fromCol, targetRow, targetCol, abilitySlug } = req.body || {};
     assertCell(match, fromRow, fromCol);
@@ -677,10 +752,10 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
 
     const attacker = match.board[fromRow][fromCol];
     const defender = match.board[targetRow][targetCol];
-    if (!attacker || attacker.owner !== req.player) throw Object.assign(new Error('No attacker selected.'), { status: 400 });
+    if (!attacker || attacker.owner !== actingPlayer) throw Object.assign(new Error('No attacker selected.'), { status: 400 });
     if (attacker.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
     if (!defender) throw Object.assign(new Error('No target at location.'), { status: 400 });
-    if (defender.owner === req.player) throw Object.assign(new Error('Cannot attack your own unit.'), { status: 400 });
+    if (defender.owner === actingPlayer) throw Object.assign(new Error('Cannot attack your own unit.'), { status: 400 });
     if (!withinRange(attacker, { row: fromRow, col: fromCol }, { row: targetRow, col: targetCol })) {
       throw Object.assign(new Error('Target out of range.'), { status: 400 });
     }
@@ -703,7 +778,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
     const roll = Math.floor(Math.random() * (damageMax - damageMin + 1)) + damageMin;
     defender.health -= roll;
     attacker.stamina -= ability.staminaCost;
-    match.log.push(`${req.player}'s ${attacker.name} used ${ability.name} for ${roll} damage.`);
+    match.log.push(`${actingPlayer}'s ${attacker.name} used ${ability.name} for ${roll} damage.`);
 
     if (defender.health <= 0) {
       match.board[targetRow][targetCol] = null;
@@ -712,7 +787,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       defeatIfEmpty(match, defender.owner);
     }
 
-    res.json({ match: summarizeMatch(match, req.player) });
+    res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('Attack error:', error.message);
     res.status(error.status || 500).json({ message: error.message || 'Failed to attack.' });
@@ -723,25 +798,26 @@ app.post('/api/matches/:id/end-turn', requireAuth, (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
-    if (!match.players.includes(req.player)) return res.status(403).json({ message: 'Not a participant.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
-    ensureTurn(match, req.player);
+    ensureTurn(match, actingPlayer);
 
     // Reset the current player's pieces for the next turn
     match.board.forEach((row) => {
       row.forEach((cell) => {
-        if (cell && cell.owner === req.player) {
+        if (cell && cell.owner === actingPlayer) {
           cell.stamina = cell.staminaMax;
           cell.summoningSickness = false;
         }
       });
     });
 
-    match.turn = match.players.find((p) => p !== req.player);
+    match.turn = match.players.find((p) => p !== actingPlayer) || actingPlayer;
     match.turnPlays = 0;
-    match.log.push(`${req.player} ended their turn.`);
+    match.log.push(`${actingPlayer} ended their turn.`);
 
-    res.json({ match: summarizeMatch(match, req.player) });
+    res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('End turn error:', error.message);
     res.status(error.status || 500).json({ message: error.message || 'Failed to end turn.' });

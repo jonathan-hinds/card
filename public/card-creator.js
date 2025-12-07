@@ -53,6 +53,7 @@ function createEffectCard(effect) {
     <p class="muted">${effect.description || 'No description'}</p>
     <div class="card-actions">
       <button class="ghost" data-edit-effect="${effect.slug}">Edit</button>
+      <button class="ghost danger" data-delete-effect="${effect.slug}">Delete</button>
     </div>
   `;
   return effectEl;
@@ -75,6 +76,7 @@ function createAbilityCard(ability) {
     <p class="muted">${ability.description || 'No description'}</p>
     <div class="card-actions">
       <button class="ghost" data-edit-ability="${ability.slug}">Edit</button>
+      <button class="ghost danger" data-delete-ability="${ability.slug}">Delete</button>
     </div>
   `;
   return abilityEl;
@@ -156,7 +158,10 @@ async function refreshCatalog() {
 
     const actions = document.createElement('div');
     actions.className = 'card-actions';
-    actions.innerHTML = `<button class="ghost" data-edit-card="${card.slug}">Edit</button>`;
+    actions.innerHTML = `
+      <button class="ghost" data-edit-card="${card.slug}">Edit</button>
+      <button class="ghost danger" data-delete-card="${card.slug}">Delete</button>
+    `;
     cardEl.appendChild(actions);
 
     catalogList.appendChild(cardEl);
@@ -278,6 +283,19 @@ addEffectForm.addEventListener('reset', () => {
   setModeLabel(effectMode, null);
 });
 
+async function deleteItem(url, slug, onSuccess) {
+  const confirmed = window.confirm(`Delete ${slug}? This cannot be undone.`);
+  if (!confirmed) return;
+
+  const res = await fetch(url, { method: 'DELETE' });
+  const data = await res.json().catch(() => ({}));
+  alert(data.message || 'Delete request finished.');
+
+  if (res.ok && typeof onSuccess === 'function') {
+    await onSuccess();
+  }
+}
+
 function populateEffectForm(effect) {
   effectEditingSlug = effect.slug;
   setModeLabel(effectMode, effect.slug);
@@ -330,6 +348,9 @@ document.body.addEventListener('click', (event) => {
   const effectSlug = target.dataset.editEffect;
   const abilitySlug = target.dataset.editAbility;
   const cardSlug = target.dataset.editCard;
+  const deleteEffectSlug = target.dataset.deleteEffect;
+  const deleteAbilitySlug = target.dataset.deleteAbility;
+  const deleteCardSlug = target.dataset.deleteCard;
 
   if (effectSlug) {
     const effect = effects.find((item) => item.slug === effectSlug);
@@ -344,6 +365,41 @@ document.body.addEventListener('click', (event) => {
   if (cardSlug) {
     const card = cards.find((item) => item.slug === cardSlug);
     if (card) populateCardForm(card);
+  }
+
+  if (deleteEffectSlug) {
+    deleteItem(`/api/effects/${deleteEffectSlug}`, deleteEffectSlug, async () => {
+      if (effectEditingSlug === deleteEffectSlug) {
+        addEffectForm.reset();
+        setModeLabel(effectMode, null);
+        effectEditingSlug = null;
+      }
+      await refreshEffects();
+      await refreshAbilities();
+    });
+  }
+
+  if (deleteAbilitySlug) {
+    deleteItem(`/api/abilities/${deleteAbilitySlug}`, deleteAbilitySlug, async () => {
+      if (abilityEditingSlug === deleteAbilitySlug) {
+        addAbilityForm.reset();
+        setModeLabel(abilityMode, null);
+        abilityEditingSlug = null;
+      }
+      await refreshAbilities();
+      await refreshCatalog();
+    });
+  }
+
+  if (deleteCardSlug) {
+    deleteItem(`/api/cards/${deleteCardSlug}`, deleteCardSlug, async () => {
+      if (cardEditingSlug === deleteCardSlug) {
+        addCardForm.reset();
+        setModeLabel(cardMode, null);
+        cardEditingSlug = null;
+      }
+      await refreshCatalog();
+    });
   }
 });
 

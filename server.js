@@ -480,6 +480,23 @@ app.put('/api/effects/:slug', async (req, res) => {
   }
 });
 
+app.delete('/api/effects/:slug', async (req, res) => {
+  const { slug } = req.params;
+
+  try {
+    const { effectsCollection: collection } = await ensureDatabase();
+    const result = await collection.deleteOne({ slug });
+    if (!result.deletedCount) {
+      return res.status(404).json({ message: 'Effect not found.' });
+    }
+    await refreshEffectCache();
+    res.json({ message: 'Effect deleted.' });
+  } catch (error) {
+    console.error('Effect delete error:', error);
+    res.status(500).json({ message: 'Failed to delete effect.' });
+  }
+});
+
 app.get('/api/abilities', async (_req, res) => {
   try {
     const { abilitiesCollection: collection } = await ensureDatabase();
@@ -609,6 +626,22 @@ app.put('/api/abilities/:slug', async (req, res) => {
   }
 });
 
+app.delete('/api/abilities/:slug', async (req, res) => {
+  const { slug } = req.params;
+
+  try {
+    const { abilitiesCollection: collection } = await ensureDatabase();
+    const result = await collection.deleteOne({ slug });
+    if (!result.deletedCount) {
+      return res.status(404).json({ message: 'Ability not found.' });
+    }
+    res.json({ message: 'Ability deleted.' });
+  } catch (error) {
+    console.error('Ability delete error:', error);
+    res.status(500).json({ message: 'Failed to delete ability.' });
+  }
+});
+
 app.get('/api/cards', async (_req, res) => {
   try {
     const { cardsCollection, abilitiesCollection } = await ensureDatabase();
@@ -663,6 +696,22 @@ app.put('/api/cards/:slug', async (req, res) => {
   } catch (error) {
     console.error('Card update error:', error);
     res.status(500).json({ message: 'Failed to update card.' });
+  }
+});
+
+app.delete('/api/cards/:slug', async (req, res) => {
+  const { slug } = req.params;
+
+  try {
+    const { cardsCollection: collection } = await ensureDatabase();
+    const result = await collection.deleteOne({ slug });
+    if (!result.deletedCount) {
+      return res.status(404).json({ message: 'Card not found.' });
+    }
+    res.json({ message: 'Card deleted.' });
+  } catch (error) {
+    console.error('Card delete error:', error);
+    res.status(500).json({ message: 'Failed to delete card.' });
   }
 });
 

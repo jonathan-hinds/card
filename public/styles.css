@@ -254,6 +254,11 @@ h1 {
   cursor: pointer;
 }
 
+.ghost.danger {
+  color: #ffb3b3;
+  border-color: #ffb3b3;
+}
+
 .status {
   min-height: 44px;
   border: 2px solid var(--border);

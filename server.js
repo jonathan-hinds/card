@@ -413,6 +413,52 @@ app.post('/api/hand', requireAuth, async (req, res) => {
   }
 });
 
+app.put('/api/hand/:slug', requireAuth, async (req, res) => {
+  const { slug } = req.params;
+  const { quantity } = req.body || {};
+
+  if (quantity === undefined || quantity < 0) {
+    return res.status(400).json({ message: 'Quantity must be zero or greater.' });
+  }
+
+  try {
+    const player = await loadPlayer(req.player);
+    if (!player) return res.status(404).json({ message: 'Player not found.' });
+
+    const hand = player.hand || [];
+    const existingIndex = hand.findIndex((item) => item.slug === slug);
+
+    const totalWithoutCurrent = hand
+      .filter((_, idx) => idx !== existingIndex)
+      .reduce((sum, entry) => sum + entry.count, 0);
+
+    if (quantity === 0) {
+      if (existingIndex !== -1) hand.splice(existingIndex, 1);
+    } else {
+      const card = await getCardBySlug(slug);
+      if (!card) return res.status(404).json({ message: 'Card not found.' });
+
+      if (totalWithoutCurrent + quantity > gameConfig.handSize) {
+        return res.status(400).json({ message: `Hand limit is ${gameConfig.handSize} cards.` });
+      }
+
+      if (existingIndex !== -1) {
+        hand[existingIndex].count = quantity;
+      } else {
+        hand.push({ slug, count: quantity });
+      }
+    }
+
+    const { usersCollection: collection } = await ensureDatabase();
+    await collection.updateOne({ username: req.player }, { $set: { hand } });
+
+    res.json({ message: 'Hand updated.', hand, limit: gameConfig.handSize });
+  } catch (error) {
+    console.error('Hand update error:', error);
+    res.status(500).json({ message: 'Failed to update hand.' });
+  }
+});
+
 app.post('/api/hand/clear', requireAuth, async (req, res) => {
   try {
     const { usersCollection: collection } = await ensureDatabase();

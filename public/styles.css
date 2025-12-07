@@ -482,6 +482,14 @@ h1 {
   hyphens: none;
 }
 
+.ability-card .ability-description,
+.ability-card .ability-effects {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: initial;
+  line-height: 1.35;
+}
+
 .ability-meta {
   display: flex;
   flex-wrap: wrap;

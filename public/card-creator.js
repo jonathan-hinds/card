@@ -73,7 +73,7 @@ function createAbilityCard(ability, { showActions = true, compact = false } = {}
     <div class="card-header tight">
       <div>
         <p class="label">${ability.name}</p>
-        <p class="muted small-text">${ability.description || 'No description'}</p>
+        <p class="muted small-text ability-description">${ability.description || 'No description'}</p>
       </div>
       <p class="slug-label">${ability.slug}</p>
     </div>
@@ -83,7 +83,7 @@ function createAbilityCard(ability, { showActions = true, compact = false } = {}
       <span>Range ${range}</span>
       <span>DMG ${damage}</span>
     </div>
-    <p class="muted small-text">Effects: ${formatEffects(ability.effects)}</p>
+    <p class="muted small-text ability-effects">Effects: ${formatEffects(ability.effects)}</p>
     ${
       showActions
         ? `<div class="card-actions">

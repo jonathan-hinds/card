@@ -93,16 +93,22 @@ function renderBoard(board) {
         const abilityName = document.createElement('p');
         abilityName.className = 'ability-name';
         abilityName.textContent = ability.title;
-        const abilityMeta = document.createElement('p');
-        abilityMeta.className = 'ability-meta';
-        const metaParts = [];
-        if (ability.damage) metaParts.push(`DMG ${ability.damage}`);
-        if (ability.cost) metaParts.push(`Cost ${ability.cost}`);
-        abilityMeta.textContent = metaParts.join(' · ');
+
+        const abilityDamage = document.createElement('p');
+        abilityDamage.className = 'ability-damage';
+        abilityDamage.textContent = ability.damage ? `DMG ${ability.damage}` : '';
+
+        const abilityCost = document.createElement('p');
+        abilityCost.className = 'ability-cost';
+        abilityCost.textContent = ability.cost ? `Cost ${ability.cost}` : '';
+
         const abilityDesc = document.createElement('p');
         abilityDesc.className = 'ability-desc';
         abilityDesc.textContent = ability.description;
-        bodyEl.append(abilityName, abilityMeta, abilityDesc);
+
+        [abilityName, abilityDamage, abilityCost, abilityDesc]
+          .filter((el) => el.textContent)
+          .forEach((el) => bodyEl.appendChild(el));
 
         const statsEl = document.createElement('div');
         statsEl.className = 'unit-stats';

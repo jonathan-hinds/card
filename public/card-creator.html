@@ -37,17 +37,31 @@
           <p class="muted">Seeded with the Grunt card.</p>
         </div>
         <div class="catalog-grid" id="catalog-list"></div>
-        <form class="inline-form" id="add-card-form">
-          <input type="text" name="slug" placeholder="slug" required />
-          <input type="text" name="name" placeholder="name" required />
-          <input type="number" name="health" placeholder="health" min="1" required />
-          <input type="number" name="stamina" placeholder="stamina" min="1" required />
-          <input type="number" name="speed" placeholder="speed" min="0" required />
-          <input type="number" name="range" placeholder="range" min="0" required />
-          <select name="ability" id="card-ability" required>
-            <option value="">Select ability</option>
-          </select>
-          <button class="cta" type="submit">Add Card</button>
+        <form class="form-card" id="add-card-form">
+          <div class="form-header">
+            <div>
+              <p class="label">Create or edit card</p>
+              <p class="muted">Slug must be unique.</p>
+            </div>
+            <p class="pill" id="card-mode">Create</p>
+          </div>
+          <div class="form-grid">
+            <label class="field">Slug<input type="text" name="slug" required /></label>
+            <label class="field">Name<input type="text" name="name" required /></label>
+            <label class="field">Health<input type="number" name="health" min="1" required /></label>
+            <label class="field">Stamina<input type="number" name="stamina" min="1" required /></label>
+            <label class="field">Speed<input type="number" name="speed" min="0" required /></label>
+            <label class="field">Range<input type="number" name="range" min="0" required /></label>
+            <label class="field span-2">Ability
+              <select name="ability" id="card-ability" required>
+                <option value="">Select ability</option>
+              </select>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="ghost" type="reset">Reset</button>
+            <button class="cta" type="submit">Save card</button>
+          </div>
         </form>
       </section>
 
@@ -57,26 +71,42 @@
           <p class="muted">Create reusable gameplay effects.</p>
         </div>
         <div class="catalog-grid" id="effect-list"></div>
-        <form class="inline-form" id="add-effect-form">
-          <input type="text" name="slug" placeholder="slug" required />
-          <input type="text" name="name" placeholder="name" required />
-          <select name="type" required>
-            <option value="buff">Buff</option>
-            <option value="debuff">Debuff</option>
-            <option value="neutral">Neutral</option>
-          </select>
-          <select name="targetHint">
-            <option value="">Target hint</option>
-            <option value="enemy">Enemy</option>
-            <option value="friendly">Friendly</option>
-            <option value="any">Any</option>
-          </select>
-          <input type="text" name="duration" placeholder="duration (e.g. turn)" />
-          <input type="number" name="staminaChange" placeholder="stamina change" />
-          <input type="number" name="damageBonusMin" placeholder="bonus dmg min" />
-          <input type="number" name="damageBonusMax" placeholder="bonus dmg max" />
-          <input type="text" name="description" placeholder="description" />
-          <button class="cta" type="submit">Add Effect</button>
+        <form class="form-card" id="add-effect-form">
+          <div class="form-header">
+            <div>
+              <p class="label">Create or edit effect</p>
+              <p class="muted">Configure buffs, debuffs, and neutral effects.</p>
+            </div>
+            <p class="pill" id="effect-mode">Create</p>
+          </div>
+          <div class="form-grid">
+            <label class="field">Slug<input type="text" name="slug" required /></label>
+            <label class="field">Name<input type="text" name="name" required /></label>
+            <label class="field">Type
+              <select name="type" required>
+                <option value="buff">Buff</option>
+                <option value="debuff">Debuff</option>
+                <option value="neutral">Neutral</option>
+              </select>
+            </label>
+            <label class="field">Target hint
+              <select name="targetHint">
+                <option value="">Auto</option>
+                <option value="enemy">Enemy</option>
+                <option value="friendly">Friendly</option>
+                <option value="any">Any</option>
+              </select>
+            </label>
+            <label class="field">Duration<input type="text" name="duration" placeholder="e.g. turn" /></label>
+            <label class="field">Stamina change<input type="number" name="staminaChange" /></label>
+            <label class="field">Bonus dmg min<input type="number" name="damageBonusMin" /></label>
+            <label class="field">Bonus dmg max<input type="number" name="damageBonusMax" /></label>
+            <label class="field span-2">Description<input type="text" name="description" /></label>
+          </div>
+          <div class="form-actions">
+            <button class="ghost" type="reset">Reset</button>
+            <button class="cta" type="submit">Save effect</button>
+          </div>
         </form>
       </section>
 
@@ -86,23 +116,39 @@
           <p class="muted">Reusable abilities assigned to cards.</p>
         </div>
         <div class="catalog-grid" id="ability-list"></div>
-        <form class="inline-form" id="add-ability-form">
-          <input type="text" name="slug" placeholder="slug" required />
-          <input type="text" name="name" placeholder="name" required />
-          <input type="number" name="min" placeholder="min dmg" min="0" />
-          <input type="number" name="max" placeholder="max dmg" min="0" />
-          <input type="number" name="staminaCost" placeholder="stamina cost" min="0" required />
-          <select name="targetType" id="ability-target" required>
-            <option value="">Target type</option>
-            <option value="enemy">Enemy</option>
-            <option value="friendly">Friendly</option>
-            <option value="any">Any</option>
-          </select>
-          <select name="effects" id="ability-effects" multiple size="3">
-            <option value="">Select effects</option>
-          </select>
-          <input type="text" name="description" placeholder="description" />
-          <button class="cta" type="submit">Add Ability</button>
+        <form class="form-card" id="add-ability-form">
+          <div class="form-header">
+            <div>
+              <p class="label">Create or edit ability</p>
+              <p class="muted">Targeting, damage, and effect hooks.</p>
+            </div>
+            <p class="pill" id="ability-mode">Create</p>
+          </div>
+          <div class="form-grid">
+            <label class="field">Slug<input type="text" name="slug" required /></label>
+            <label class="field">Name<input type="text" name="name" required /></label>
+            <label class="field">Min dmg<input type="number" name="min" min="0" /></label>
+            <label class="field">Max dmg<input type="number" name="max" min="0" /></label>
+            <label class="field">Stamina cost<input type="number" name="staminaCost" min="0" required /></label>
+            <label class="field">Target type
+              <select name="targetType" id="ability-target" required>
+                <option value="">Select target</option>
+                <option value="enemy">Enemy</option>
+                <option value="friendly">Friendly</option>
+                <option value="any">Any</option>
+              </select>
+            </label>
+            <label class="field span-2">Effects
+              <select name="effects" id="ability-effects" multiple size="3">
+                <option value="">Select effects</option>
+              </select>
+            </label>
+            <label class="field span-2">Description<input type="text" name="description" /></label>
+          </div>
+          <div class="form-actions">
+            <button class="ghost" type="reset">Reset</button>
+            <button class="cta" type="submit">Save ability</button>
+          </div>
         </form>
       </section>
     </main>

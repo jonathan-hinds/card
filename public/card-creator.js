@@ -12,9 +12,16 @@ const abilityEffectSelect = document.getElementById('ability-effects');
 const abilityTargetSelect = document.getElementById('ability-target');
 const effectList = document.getElementById('effect-list');
 const addEffectForm = document.getElementById('add-effect-form');
+const cardMode = document.getElementById('card-mode');
+const abilityMode = document.getElementById('ability-mode');
+const effectMode = document.getElementById('effect-mode');
 
 let abilities = [];
 let effects = [];
+let cards = [];
+let cardEditingSlug = null;
+let abilityEditingSlug = null;
+let effectEditingSlug = null;
 
 function formatEffects(effectSlugs = []) {
   if (!effectSlugs.length) return 'No effects';
@@ -26,7 +33,7 @@ function formatEffects(effectSlugs = []) {
 
 function createEffectCard(effect) {
   const effectEl = document.createElement('div');
-  effectEl.className = 'card';
+  effectEl.className = 'card catalog-card';
   const target = effect.targetHint || 'any';
   const staminaChange = effect.modifiers?.staminaChange;
   const damageBonus = effect.modifiers?.damageBonus;
@@ -35,24 +42,40 @@ function createEffectCard(effect) {
   const modifierSummary = [staminaText, damageText].filter(Boolean).join(' · ');
 
   effectEl.innerHTML = `
-    <p class="label">${effect.name}</p>
-    <p class="muted">slug: ${effect.slug}</p>
-    <p>${effect.type || 'neutral'} · target ${target} ${modifierSummary ? `· ${modifierSummary}` : ''}</p>
+    <div class="card-header">
+      <div>
+        <p class="label">${effect.name}</p>
+        <p class="muted">${effect.type || 'neutral'} · Target ${target}</p>
+      </div>
+      <p class="pill">${effect.slug}</p>
+    </div>
+    <p>${modifierSummary || 'No modifiers'}</p>
     <p class="muted">${effect.description || 'No description'}</p>
+    <div class="card-actions">
+      <button class="ghost" data-edit-effect="${effect.slug}">Edit</button>
+    </div>
   `;
   return effectEl;
 }
 
 function createAbilityCard(ability) {
   const abilityEl = document.createElement('div');
-  abilityEl.className = 'card ability-card';
+  abilityEl.className = 'card ability-card catalog-card';
   const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
   abilityEl.innerHTML = `
-    <p class="label">${ability.name}</p>
-    <p class="muted">slug: ${ability.slug}</p>
-    <p>DMG ${damage} · Cost ${ability.staminaCost} STA · Target ${ability.targetType || 'enemy'}</p>
+    <div class="card-header">
+      <div>
+        <p class="label">${ability.name}</p>
+        <p class="muted">Target ${ability.targetType || 'enemy'} · Cost ${ability.staminaCost} STA</p>
+      </div>
+      <p class="pill">${ability.slug}</p>
+    </div>
+    <p>Damage ${damage}</p>
     <p class="muted">Effects: ${formatEffects(ability.effects)}</p>
     <p class="muted">${ability.description || 'No description'}</p>
+    <div class="card-actions">
+      <button class="ghost" data-edit-ability="${ability.slug}">Edit</button>
+    </div>
   `;
   return abilityEl;
 }
@@ -102,8 +125,9 @@ async function refreshAbilities() {
 async function refreshCatalog() {
   const res = await fetch('/api/cards');
   const data = await res.json();
+  cards = data.cards || [];
   catalogList.innerHTML = '';
-  data.cards.forEach((card) => {
+  cards.forEach((card) => {
     const cardAbilities = card.abilityDetails?.length
       ? card.abilityDetails
       : (card.abilities || [])
@@ -111,11 +135,15 @@ async function refreshCatalog() {
           .filter(Boolean);
 
     const cardEl = document.createElement('div');
-    cardEl.className = 'card';
+    cardEl.className = 'card catalog-card';
     cardEl.innerHTML = `
-      <p class="label">${card.name}</p>
-      <p class="muted">slug: ${card.slug}</p>
-      <p>${formatStats(card)}</p>
+      <div class="card-header">
+        <div>
+          <p class="label">${card.name}</p>
+          <p class="muted">${formatStats(card)}</p>
+        </div>
+        <p class="pill">${card.slug}</p>
+      </div>
       <p class="muted">Abilities: ${summarizeAbilities(cardAbilities)}</p>
     `;
 
@@ -125,8 +153,19 @@ async function refreshCatalog() {
       cardAbilities.forEach((ability) => abilityWrapper.appendChild(createAbilityCard(ability)));
     }
     cardEl.appendChild(abilityWrapper);
+
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    actions.innerHTML = `<button class="ghost" data-edit-card="${card.slug}">Edit</button>`;
+    cardEl.appendChild(actions);
+
     catalogList.appendChild(cardEl);
   });
+}
+
+function setModeLabel(modeEl, slug) {
+  if (!modeEl) return;
+  modeEl.textContent = slug ? `Editing ${slug}` : 'Create';
 }
 
 addCardForm.addEventListener('submit', async (event) => {
@@ -143,8 +182,8 @@ addCardForm.addEventListener('submit', async (event) => {
     },
     abilities: form.get('ability') ? [form.get('ability')] : [],
   };
-  const res = await fetch('/api/cards', {
-    method: 'POST',
+  const res = await fetch(cardEditingSlug ? `/api/cards/${cardEditingSlug}` : '/api/cards', {
+    method: cardEditingSlug ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -152,6 +191,8 @@ addCardForm.addEventListener('submit', async (event) => {
   alert(data.message || 'Updated catalog');
   if (res.ok) {
     addCardForm.reset();
+    cardEditingSlug = null;
+    setModeLabel(cardMode, null);
     refreshAbilities();
     refreshCatalog();
   }
@@ -172,8 +213,8 @@ addEffectForm.addEventListener('submit', async (event) => {
     damageBonusMax: form.get('damageBonusMax'),
   };
 
-  const res = await fetch('/api/effects', {
-    method: 'POST',
+  const res = await fetch(effectEditingSlug ? `/api/effects/${effectEditingSlug}` : '/api/effects', {
+    method: effectEditingSlug ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -182,6 +223,8 @@ addEffectForm.addEventListener('submit', async (event) => {
   alert(data.message || 'Updated effects');
   if (res.ok) {
     addEffectForm.reset();
+    effectEditingSlug = null;
+    setModeLabel(effectMode, null);
     await refreshEffects();
   }
 });
@@ -202,8 +245,8 @@ addAbilityForm.addEventListener('submit', async (event) => {
     effects: effectsSelection,
     description: form.get('description'),
   };
-  const res = await fetch('/api/abilities', {
-    method: 'POST',
+  const res = await fetch(abilityEditingSlug ? `/api/abilities/${abilityEditingSlug}` : '/api/abilities', {
+    method: abilityEditingSlug ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -213,8 +256,94 @@ addAbilityForm.addEventListener('submit', async (event) => {
     addAbilityForm.reset();
     if (abilityTargetSelect) abilityTargetSelect.value = 'enemy';
     if (abilityEffectSelect) abilityEffectSelect.selectedIndex = 0;
+    abilityEditingSlug = null;
+    setModeLabel(abilityMode, null);
     refreshAbilities();
     refreshCatalog();
+  }
+});
+
+addCardForm.addEventListener('reset', () => {
+  cardEditingSlug = null;
+  setModeLabel(cardMode, null);
+});
+
+addAbilityForm.addEventListener('reset', () => {
+  abilityEditingSlug = null;
+  setModeLabel(abilityMode, null);
+});
+
+addEffectForm.addEventListener('reset', () => {
+  effectEditingSlug = null;
+  setModeLabel(effectMode, null);
+});
+
+function populateEffectForm(effect) {
+  effectEditingSlug = effect.slug;
+  setModeLabel(effectMode, effect.slug);
+  addEffectForm.slug.value = effect.slug;
+  addEffectForm.name.value = effect.name;
+  addEffectForm.type.value = effect.type || 'neutral';
+  addEffectForm.targetHint.value = effect.targetHint || '';
+  addEffectForm.duration.value = effect.duration || '';
+  addEffectForm.staminaChange.value = effect.modifiers?.staminaChange ?? '';
+  addEffectForm.damageBonusMin.value = effect.modifiers?.damageBonus?.min ?? '';
+  addEffectForm.damageBonusMax.value = effect.modifiers?.damageBonus?.max ?? '';
+  addEffectForm.description.value = effect.description || '';
+}
+
+function populateAbilityForm(ability) {
+  abilityEditingSlug = ability.slug;
+  setModeLabel(abilityMode, ability.slug);
+  addAbilityForm.slug.value = ability.slug;
+  addAbilityForm.name.value = ability.name;
+  addAbilityForm.min.value = ability.damage?.min ?? '';
+  addAbilityForm.max.value = ability.damage?.max ?? '';
+  addAbilityForm.staminaCost.value = ability.staminaCost;
+  addAbilityForm.targetType.value = ability.targetType || 'enemy';
+  Array.from(abilityEffectSelect.options).forEach((opt) => {
+    opt.selected = ability.effects?.includes(opt.value) || false;
+  });
+  addAbilityForm.description.value = ability.description || '';
+}
+
+function populateCardForm(card) {
+  cardEditingSlug = card.slug;
+  setModeLabel(cardMode, card.slug);
+  addCardForm.slug.value = card.slug;
+  addCardForm.name.value = card.name;
+  addCardForm.health.value = card.stats?.health ?? '';
+  addCardForm.stamina.value = card.stats?.stamina ?? '';
+  addCardForm.speed.value = card.stats?.speed ?? '';
+  addCardForm.range.value = card.stats?.attackRange ?? '';
+  if (card.abilities?.length) {
+    cardAbilitySelect.value = card.abilities[0];
+  } else {
+    cardAbilitySelect.selectedIndex = 0;
+  }
+}
+
+document.body.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const effectSlug = target.dataset.editEffect;
+  const abilitySlug = target.dataset.editAbility;
+  const cardSlug = target.dataset.editCard;
+
+  if (effectSlug) {
+    const effect = effects.find((item) => item.slug === effectSlug);
+    if (effect) populateEffectForm(effect);
+  }
+
+  if (abilitySlug) {
+    const ability = abilities.find((item) => item.slug === abilitySlug);
+    if (ability) populateAbilityForm(ability);
+  }
+
+  if (cardSlug) {
+    const card = cards.find((item) => item.slug === cardSlug);
+    if (card) populateCardForm(card);
   }
 });
 

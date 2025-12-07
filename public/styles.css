@@ -179,6 +179,50 @@ h1 {
   align-items: center;
 }
 
+.form-card {
+  border: 2px solid var(--border);
+  background: #050505;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.form-grid .field {
+  text-transform: none;
+}
+
+.form-grid .span-2 {
+  grid-column: span 2;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pill {
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--fg);
+  font-size: 11px;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
 .stacked {
   display: grid;
   gap: 8px;
@@ -257,6 +301,27 @@ h1 {
   border: 2px solid var(--border);
   padding: 10px;
   background: #0a0a0a;
+}
+
+.catalog-card {
+  display: grid;
+  gap: 8px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.card-header .label {
+  margin-bottom: 4px;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .ability-row {

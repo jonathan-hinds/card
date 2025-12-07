@@ -104,7 +104,9 @@ function renderHand(entries) {
   const catalogMap = new Map(catalog.map((card) => [card.slug, card]));
 
   entries.forEach((entry) => {
-    const card = catalogMap.get(entry.slug) || { slug: entry.slug, name: entry.slug, stats: { health: '?', stamina: '?', speed: '?', attackRange: '?' }, abilityDetails: [] };
+    const card =
+      catalogMap.get(entry.slug) ||
+      { slug: entry.slug, name: entry.slug, stats: { health: '?', stamina: '?', speed: '?' }, abilityDetails: [] };
     const cardTile = createCardTile(card);
 
     const controls = document.createElement('div');

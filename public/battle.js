@@ -45,7 +45,7 @@ function getPrimaryAbility(piece) {
       ? ability.range
       : Number.isFinite(ability.attackRange)
         ? ability.attackRange
-        : piece?.attackRange;
+        : 1;
     return {
       title: ability.name || ability.slug || 'Ability',
       cost: Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '',
@@ -58,8 +58,7 @@ function getPrimaryAbility(piece) {
     };
   }
   const slug = Array.isArray(piece?.abilities) ? piece.abilities[0] : piece?.abilities;
-  const fallbackRange = Number.isFinite(piece?.attackRange) ? `${piece.attackRange}` : '';
-  return { title: slug || 'Ability', cost: '', damage: '', range: fallbackRange, description: '—' };
+  return { title: slug || 'Ability', cost: '', damage: '', range: '', description: '—' };
 }
 
 function resetHighlights() {
@@ -205,7 +204,9 @@ function renderLog(lines) {
 function describePiece(piece) {
   if (!piece) return '';
   const sickness = piece.summoningSickness ? ' · Summoning Sickness' : '';
-  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed} · RNG ${piece.attackRange}${sickness}`;
+  const primary = getPrimaryAbility(piece);
+  const rangeText = primary.range ? ` · RNG ${primary.range}` : '';
+  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}`;
 }
 
 function updateOverlay() {
@@ -301,7 +302,7 @@ function calculateTargets(piece, position) {
     ? ability.range
     : Number.isFinite(ability?.attackRange)
       ? ability.attackRange
-      : piece.attackRange;
+      : 1;
   const targetType = ability?.targetType || 'enemy';
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {

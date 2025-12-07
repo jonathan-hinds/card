@@ -355,6 +355,15 @@ h1 {
   line-height: 1.3;
 }
 
+.ability-meta {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--muted);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .ability-desc {
   font-size: 10px;
   line-height: 1.3;

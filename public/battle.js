@@ -36,11 +36,14 @@ function getPrimaryAbility(piece) {
     return {
       title: ability.name || ability.slug || 'Ability',
       cost: Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '',
+      damage: ability.damage
+        ? `${ability.damage.min}-${ability.damage.max}`
+        : '',
       description: ability.description || '—',
     };
   }
   const slug = Array.isArray(piece?.abilities) ? piece.abilities[0] : piece?.abilities;
-  return { title: slug || 'Ability', cost: '', description: '—' };
+  return { title: slug || 'Ability', cost: '', damage: '', description: '—' };
 }
 
 function resetHighlights() {
@@ -89,11 +92,17 @@ function renderBoard(board) {
         bodyEl.className = 'unit-body';
         const abilityName = document.createElement('p');
         abilityName.className = 'ability-name';
-        abilityName.textContent = ability.cost ? `${ability.title} · ${ability.cost}` : ability.title;
+        abilityName.textContent = ability.title;
+        const abilityMeta = document.createElement('p');
+        abilityMeta.className = 'ability-meta';
+        const metaParts = [];
+        if (ability.damage) metaParts.push(`DMG ${ability.damage}`);
+        if (ability.cost) metaParts.push(`Cost ${ability.cost}`);
+        abilityMeta.textContent = metaParts.join(' · ');
         const abilityDesc = document.createElement('p');
         abilityDesc.className = 'ability-desc';
         abilityDesc.textContent = ability.description;
-        bodyEl.append(abilityName, abilityDesc);
+        bodyEl.append(abilityName, abilityMeta, abilityDesc);
 
         const statsEl = document.createElement('div');
         statsEl.className = 'unit-stats';

@@ -72,7 +72,9 @@ export function formatStats(card) {
 export function formatAbility(ability) {
   if (!ability) return 'Unknown ability';
   const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
-  return `${ability.name} · DMG ${damage} · Cost ${ability.staminaCost} STA`;
+  const target = ability.targetType ? ` · Target ${ability.targetType}` : '';
+  const effectCount = ability.effects?.length ? ` · Effects ${ability.effects.length}` : '';
+  return `${ability.name} · DMG ${damage} · Cost ${ability.staminaCost} STA${target}${effectCount}`;
 }
 
 export function summarizeAbilities(abilities = []) {

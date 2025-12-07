@@ -5,12 +5,16 @@ const { MongoClient } = require('mongodb');
 
 const mongoConfig = require('./config/mongo-config');
 const gameConfig = require('./config/game-config.json');
+const effectCatalog = require('./config/effects-catalog');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || mongoConfig.mongoUri;
 const DATABASE_NAME = process.env.MONGO_DB_NAME || 'card-battles';
 const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
+
+const TARGET_TYPES = new Set(['enemy', 'friendly', 'any']);
+const effectMap = new Map(effectCatalog.map((effect) => [effect.slug, effect]));
 
 let usersCollection;
 let cardsCollection;
@@ -73,11 +77,43 @@ async function seedAbilities(collection) {
     staminaCost: 1,
     damage: { min: 1, max: 3 },
     description: 'Strike a nearby foe using the unit\'s basic training.',
+    targetType: 'enemy',
+    effects: [],
+  };
+
+  const battleFocus = {
+    slug: 'battle-focus',
+    name: 'Battle Focus',
+    staminaCost: 1,
+    description: 'Bolster an ally for the current turn with extra damage.',
+    targetType: 'friendly',
+    effects: ['damage-boost-turn'],
+  };
+
+  const fatigue = {
+    slug: 'fatigue',
+    name: 'Fatigue',
+    staminaCost: 1,
+    description: 'Sap an enemy\'s stamina for the rest of the turn.',
+    targetType: 'enemy',
+    effects: ['stamina-sapped-turn'],
   };
 
   await collection.updateOne(
     { slug: basicAttack.slug },
     { $set: { ...basicAttack }, $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
+
+  await collection.updateOne(
+    { slug: battleFocus.slug },
+    { $set: { ...battleFocus }, $setOnInsert: { createdAt: new Date() } },
+    { upsert: true }
+  );
+
+  await collection.updateOne(
+    { slug: fatigue.slug },
+    { $set: { ...fatigue }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
 }
@@ -115,6 +151,33 @@ function sanitizePlayer(playerDoc) {
   if (!playerDoc) return null;
   const { passwordHash, salt, ...safe } = playerDoc;
   return safe;
+}
+
+function parseDamage(damage) {
+  if (!damage || (damage.min === undefined && damage.max === undefined)) return null;
+  const min = Number(damage.min ?? 0);
+  const max = Number(damage.max ?? min);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+    throw Object.assign(new Error('Damage requires valid min and max values.'), { status: 400 });
+  }
+  return { min, max };
+}
+
+function validateTargetType(targetType) {
+  const value = targetType || 'enemy';
+  if (!TARGET_TYPES.has(value)) {
+    throw Object.assign(new Error('Invalid target type.'), { status: 400 });
+  }
+  return value;
+}
+
+function buildActiveEffect(effect, turnOwner) {
+  return {
+    slug: effect.slug,
+    name: effect.name,
+    expiresAfterTurn: turnOwner,
+    modifiers: effect.modifiers || {},
+  };
 }
 
 function createEmptyBoard() {
@@ -271,6 +334,10 @@ app.get('/api/profile', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/effects', (_req, res) => {
+  res.json({ effects: effectCatalog });
+});
+
 app.get('/api/abilities', async (_req, res) => {
   try {
     const { abilitiesCollection: collection } = await ensureDatabase();
@@ -288,18 +355,40 @@ app.post('/api/abilities', async (req, res) => {
     return res.status(400).json({ message: 'Ability requires slug, name, and stamina cost.' });
   }
 
-  const damageMin = Number(ability?.damage?.min ?? 0);
-  const damageMax = Number(ability?.damage?.max ?? 0);
+  let parsedDamage = null;
+  try {
+    parsedDamage = parseDamage(ability.damage);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message || 'Invalid damage values.' });
+  }
 
-  if (Number.isNaN(damageMin) || Number.isNaN(damageMax) || damageMin > damageMax) {
-    return res.status(400).json({ message: 'Damage requires valid min and max values.' });
+  let targetType;
+  try {
+    targetType = validateTargetType(ability.targetType);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message });
+  }
+
+  const requestedEffects = Array.isArray(ability.effects)
+    ? ability.effects
+    : ability.effects
+      ? [ability.effects]
+      : [];
+
+  const unknownEffects = requestedEffects.filter((slug) => !effectMap.has(slug));
+  if (unknownEffects.length) {
+    return res
+      .status(400)
+      .json({ message: `Unknown effects: ${unknownEffects.join(', ')}` });
   }
 
   try {
     const { abilitiesCollection: collection } = await ensureDatabase();
     await collection.insertOne({
       ...ability,
-      damage: { min: damageMin, max: damageMax },
+      damage: parsedDamage || undefined,
+      effects: requestedEffects,
+      targetType,
       staminaCost: Number(ability.staminaCost),
       createdAt: new Date(),
     });
@@ -620,6 +709,57 @@ function ensureActive(match) {
   }
 }
 
+function calculateDamageRoll(ability, attacker) {
+  if (!ability?.damage) return 0;
+  const damageMin = ability.damage?.min ?? 0;
+  const damageMax = ability.damage?.max ?? damageMin;
+  let roll = Math.floor(Math.random() * (damageMax - damageMin + 1)) + damageMin;
+
+  const bonuses = (attacker.activeEffects || []).map((effect) => effect.modifiers?.damageBonus).filter(Boolean);
+  bonuses.forEach((bonus) => {
+    const min = bonus.min ?? 0;
+    const max = bonus.max ?? min;
+    roll += Math.floor(Math.random() * (max - min + 1)) + min;
+  });
+
+  return roll;
+}
+
+function applyAbilityEffects(ability, target, match, log) {
+  if (!ability.effects || !ability.effects.length) return;
+  target.activeEffects = target.activeEffects || [];
+
+  ability.effects.forEach((slug) => {
+    const effect = effectMap.get(slug);
+    if (!effect) return;
+    const active = buildActiveEffect(effect, match.turn);
+    target.activeEffects.push(active);
+
+    if (typeof active.modifiers?.staminaChange === 'number') {
+      target.stamina = Math.max(0, Math.min(target.staminaMax, target.stamina + active.modifiers.staminaChange));
+    }
+
+    log.push(`${target.owner}'s ${target.name} is affected by ${effect.name}.`);
+  });
+}
+
+function clearExpiredEffects(match, turnOwner) {
+  match.board.forEach((row) => {
+    row.forEach((cell) => {
+      if (cell?.activeEffects?.length) {
+        const expired = cell.activeEffects.filter((effect) => effect.expiresAfterTurn === turnOwner);
+        expired.forEach((effect) => {
+          if (typeof effect.modifiers?.staminaChange === 'number') {
+            const reversal = -1 * effect.modifiers.staminaChange;
+            cell.stamina = Math.min(cell.staminaMax, cell.stamina + reversal);
+          }
+        });
+        cell.activeEffects = cell.activeEffects.filter((effect) => effect.expiresAfterTurn !== turnOwner);
+      }
+    });
+  });
+}
+
 function assertCell(match, row, col) {
   const { rows, cols } = gameConfig.board;
   if (row < 0 || row >= rows || col < 0 || col >= cols) {
@@ -646,7 +786,15 @@ async function buildUnit(card, owner) {
   const abilityDocs = await Promise.all(abilitySlugs.map((slug) => getAbilityBySlug(slug)));
   const abilityDetails = abilityDocs
     .filter(Boolean)
-    .map(({ slug, name, description, staminaCost, damage }) => ({ slug, name, description, staminaCost, damage }));
+    .map(({ slug, name, description, staminaCost, damage, targetType, effects }) => ({
+      slug,
+      name,
+      description,
+      staminaCost,
+      damage,
+      targetType: validateTargetType(targetType),
+      effects: effects || [],
+    }));
   return {
     owner,
     slug: card.slug,
@@ -659,6 +807,7 @@ async function buildUnit(card, owner) {
     abilities: abilitySlugs,
     abilityDetails,
     summoningSickness: true,
+    activeEffects: [],
   };
 }
 
@@ -751,14 +900,10 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
     assertCell(match, targetRow, targetCol);
 
     const attacker = match.board[fromRow][fromCol];
-    const defender = match.board[targetRow][targetCol];
+    const target = match.board[targetRow][targetCol];
     if (!attacker || attacker.owner !== actingPlayer) throw Object.assign(new Error('No attacker selected.'), { status: 400 });
     if (attacker.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
-    if (!defender) throw Object.assign(new Error('No target at location.'), { status: 400 });
-    if (defender.owner === actingPlayer) throw Object.assign(new Error('Cannot attack your own unit.'), { status: 400 });
-    if (!withinRange(attacker, { row: fromRow, col: fromCol }, { row: targetRow, col: targetCol })) {
-      throw Object.assign(new Error('Target out of range.'), { status: 400 });
-    }
+    if (!target) throw Object.assign(new Error('No target at location.'), { status: 400 });
 
     const chosenAbilitySlug = abilitySlug || (attacker.abilities || [])[0] || 'basic-attack';
     if (!chosenAbilitySlug) throw Object.assign(new Error('No ability selected.'), { status: 400 });
@@ -769,22 +914,48 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
 
     const ability = await getAbilityBySlug(chosenAbilitySlug);
     if (!ability) throw Object.assign(new Error('Ability not found.'), { status: 404 });
+    const targetType = validateTargetType(ability.targetType);
+
+    if (targetType === 'enemy' && target.owner === actingPlayer) {
+      throw Object.assign(new Error('This ability targets enemies.'), { status: 400 });
+    }
+    if (targetType === 'friendly' && target.owner !== actingPlayer) {
+      throw Object.assign(new Error('This ability targets friendly units.'), { status: 400 });
+    }
+
+    const attackRange = Number.isFinite(ability.range) ? ability.range : attacker.attackRange;
+    const rowDiff = Math.abs(fromRow - targetRow);
+    const colDiff = Math.abs(fromCol - targetCol);
+    const distance = Math.max(rowDiff, colDiff);
+    if (distance > attackRange) {
+      throw Object.assign(new Error('Target out of range.'), { status: 400 });
+    }
+
     if (attacker.stamina < ability.staminaCost) {
       throw Object.assign(new Error('Not enough stamina.'), { status: 400 });
     }
 
-    const damageMin = ability?.damage?.min ?? 0;
-    const damageMax = ability?.damage?.max ?? damageMin;
-    const roll = Math.floor(Math.random() * (damageMax - damageMin + 1)) + damageMin;
-    defender.health -= roll;
+    const roll = calculateDamageRoll(ability, attacker);
+    if (roll > 0) {
+      target.health -= roll;
+    }
     attacker.stamina -= ability.staminaCost;
-    match.log.push(`${actingPlayer}'s ${attacker.name} used ${ability.name} for ${roll} damage.`);
+    applyAbilityEffects(ability, target, match, match.log);
 
-    if (defender.health <= 0) {
+    const effectSummary = (ability.effects || [])
+      .map((slug) => effectMap.get(slug)?.name)
+      .filter(Boolean)
+      .join(', ');
+
+    const damageFragment = roll > 0 ? ` for ${roll} damage` : '';
+    const effectFragment = effectSummary ? ` and applied ${effectSummary}` : '';
+    match.log.push(`${actingPlayer}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment}.`);
+
+    if (target.health <= 0) {
       match.board[targetRow][targetCol] = null;
-      match.boardPieces[defender.owner] -= 1;
-      match.log.push(`${defender.owner}'s ${defender.name} was defeated.`);
-      defeatIfEmpty(match, defender.owner);
+      match.boardPieces[target.owner] -= 1;
+      match.log.push(`${target.owner}'s ${target.name} was defeated.`);
+      defeatIfEmpty(match, target.owner);
     }
 
     res.json({ match: summarizeMatch(match, actingPlayer) });
@@ -812,6 +983,8 @@ app.post('/api/matches/:id/end-turn', requireAuth, (req, res) => {
         }
       });
     });
+
+    clearExpiredEffects(match, actingPlayer);
 
     match.turn = match.players.find((p) => p !== actingPlayer) || actingPlayer;
     match.turnPlays = 0;

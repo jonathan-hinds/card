@@ -8,8 +8,19 @@ const logoutBtn = document.getElementById('logout');
 const cardAbilitySelect = document.getElementById('card-ability');
 const abilityList = document.getElementById('ability-list');
 const addAbilityForm = document.getElementById('add-ability-form');
+const abilityEffectSelect = document.getElementById('ability-effects');
+const abilityTargetSelect = document.getElementById('ability-target');
 
 let abilities = [];
+let effects = [];
+
+function formatEffects(effectSlugs = []) {
+  if (!effectSlugs.length) return 'No effects';
+  const names = effectSlugs
+    .map((slug) => effects.find((effect) => effect.slug === slug)?.name || slug)
+    .filter(Boolean);
+  return names.join(', ');
+}
 
 function createAbilityCard(ability) {
   const abilityEl = document.createElement('div');
@@ -18,10 +29,27 @@ function createAbilityCard(ability) {
   abilityEl.innerHTML = `
     <p class="label">${ability.name}</p>
     <p class="muted">slug: ${ability.slug}</p>
-    <p>DMG ${damage} · Cost ${ability.staminaCost} STA</p>
+    <p>DMG ${damage} · Cost ${ability.staminaCost} STA · Target ${ability.targetType || 'enemy'}</p>
+    <p class="muted">Effects: ${formatEffects(ability.effects)}</p>
     <p class="muted">${ability.description || 'No description'}</p>
   `;
   return abilityEl;
+}
+
+async function refreshEffects() {
+  const res = await fetch('/api/effects');
+  const data = await res.json();
+  effects = data.effects || [];
+
+  if (abilityEffectSelect) {
+    abilityEffectSelect.innerHTML = '<option value="">Select effects</option>';
+    effects.forEach((effect) => {
+      const opt = document.createElement('option');
+      opt.value = effect.slug;
+      opt.textContent = `${effect.name} (${effect.type})`;
+      abilityEffectSelect.appendChild(opt);
+    });
+  }
 }
 
 async function refreshAbilities() {
@@ -106,11 +134,17 @@ addCardForm.addEventListener('submit', async (event) => {
 addAbilityForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(addAbilityForm);
+  const minDmg = form.get('min');
+  const maxDmg = form.get('max');
+  const hasDamage = minDmg !== '' || maxDmg !== '';
+  const effectsSelection = form.getAll('effects').filter(Boolean);
   const payload = {
     slug: form.get('slug'),
     name: form.get('name'),
-    damage: { min: Number(form.get('min')), max: Number(form.get('max')) },
+    damage: hasDamage ? { min: Number(minDmg || 0), max: Number(maxDmg || minDmg || 0) } : undefined,
     staminaCost: Number(form.get('staminaCost')),
+    targetType: form.get('targetType') || 'enemy',
+    effects: effectsSelection,
     description: form.get('description'),
   };
   const res = await fetch('/api/abilities', {
@@ -122,6 +156,8 @@ addAbilityForm.addEventListener('submit', async (event) => {
   alert(data.message || 'Updated abilities');
   if (res.ok) {
     addAbilityForm.reset();
+    if (abilityTargetSelect) abilityTargetSelect.value = 'enemy';
+    if (abilityEffectSelect) abilityEffectSelect.selectedIndex = 0;
     refreshAbilities();
     refreshCatalog();
   }
@@ -132,6 +168,7 @@ async function init() {
   if (!profile) return;
   nameEl.textContent = profile.username;
   metaEl.textContent = 'Mongo-backed card tools';
+  await refreshEffects();
   await refreshAbilities();
   refreshCatalog();
 }

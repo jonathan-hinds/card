@@ -53,6 +53,7 @@ function getPrimaryAbility(piece) {
         ? `${ability.damage.min}-${ability.damage.max}`
         : '',
       range: Number.isFinite(attackRange) ? `${attackRange}` : '',
+      target: ability.targetType || 'enemy',
       description: ability.description || '—',
     };
   }
@@ -133,6 +134,13 @@ function renderBoard(board) {
           abilityCost.className = 'ability-pill ability-cost';
           abilityCost.textContent = `COST ${ability.cost}`;
           metaItems.push(abilityCost);
+        }
+
+        if (ability.target) {
+          const abilityTarget = document.createElement('span');
+          abilityTarget.className = 'ability-pill ability-target';
+          abilityTarget.textContent = `TARGET ${ability.target}`;
+          metaItems.push(abilityTarget);
         }
 
         bodyEl.appendChild(abilityName);
@@ -288,17 +296,25 @@ function calculateTargets(piece, position) {
   const { rows, cols } = boardSize();
   const range = [];
   const targets = [];
+  const ability = piece?.abilityDetails?.[0];
+  const abilityRange = Number.isFinite(ability?.range)
+    ? ability.range
+    : Number.isFinite(ability?.attackRange)
+      ? ability.attackRange
+      : piece.attackRange;
+  const targetType = ability?.targetType || 'enemy';
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
       const rowDiff = Math.abs(position.row - r);
       const colDiff = Math.abs(position.col - c);
       const distance = Math.max(rowDiff, colDiff);
-      if (distance === 0 || distance > piece.attackRange) continue;
+      if (distance === 0 || distance > abilityRange) continue;
       range.push({ row: r, col: c });
       const occupant = activeMatch.board[r][c];
-      if (occupant && occupant.owner !== piece.owner) {
-        targets.push({ row: r, col: c });
-      }
+      if (!occupant) continue;
+      if (targetType === 'enemy' && occupant.owner !== piece.owner) targets.push({ row: r, col: c });
+      if (targetType === 'friendly' && occupant.owner === piece.owner) targets.push({ row: r, col: c });
+      if (targetType === 'any') targets.push({ row: r, col: c });
     }
   }
   return { range, targets };
@@ -419,8 +435,8 @@ attackBtn.addEventListener('click', () => {
   currentMode = 'attack';
   renderBoard(activeMatch.board);
   metaEl.textContent = targets.length
-    ? 'Select a striped tile to attack.'
-    : 'No enemies in range.';
+    ? 'Select a striped tile to target.'
+    : 'No valid targets in range.';
 });
 
 cancelBtn.addEventListener('click', () => {

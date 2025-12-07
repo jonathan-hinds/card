@@ -362,19 +362,43 @@ h1 {
   border-color: #1f1f1f;
   background: #0c0c0c;
   gap: 6px;
+  padding: 8px 10px;
+}
+
+.ability-card.compact {
+  padding: 8px;
+  gap: 4px;
 }
 
 .ability-card .label {
   font-size: 13px;
 }
 
+.ability-card .slug-label {
+  font-size: 11px;
+}
+
 .ability-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.ability-card.compact .ability-meta {
+  font-size: 10px;
+  gap: 4px 8px;
+}
+
+.ability-card.compact .muted,
+.ability-card.compact .muted.small-text {
+  font-size: 10px;
+}
+
+.ability-row .ability-card {
+  width: 100%;
 }
 
 

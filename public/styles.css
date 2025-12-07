@@ -505,6 +505,14 @@ h1 {
   width: 100%;
 }
 
+.ability-row .ability-card.catalog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: auto;
+  height: auto;
+}
+
 
 .board-wrap {
   position: relative;

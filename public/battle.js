@@ -30,6 +30,19 @@ const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
 
+function getPrimaryAbility(piece) {
+  if (piece?.abilityDetails?.length) {
+    const ability = piece.abilityDetails[0];
+    return {
+      title: ability.name || ability.slug || 'Ability',
+      cost: Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '',
+      description: ability.description || '—',
+    };
+  }
+  const slug = Array.isArray(piece?.abilities) ? piece.abilities[0] : piece?.abilities;
+  return { title: slug || 'Ability', cost: '', description: '—' };
+}
+
 function resetHighlights() {
   highlights.moves.clear();
   highlights.range.clear();
@@ -58,13 +71,47 @@ function renderBoard(board) {
 
       if (cell) {
         cellEl.classList.add(cell.owner === playerName ? 'owned' : 'enemy');
-        cellEl.innerHTML = `<span>${cell.owner[0].toUpperCase()}</span><small>${cell.health}hp/${cell.stamina}sta</small>`;
+        const ability = getPrimaryAbility(cell);
+        const cardEl = document.createElement('div');
+        cardEl.className = 'unit-card';
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'unit-header';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'unit-name';
+        nameEl.textContent = cell.name;
+        const ownerEl = document.createElement('span');
+        ownerEl.className = 'unit-owner';
+        ownerEl.textContent = cell.owner;
+        headerEl.append(nameEl, ownerEl);
+
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'unit-body';
+        const abilityName = document.createElement('p');
+        abilityName.className = 'ability-name';
+        abilityName.textContent = ability.cost ? `${ability.title} · ${ability.cost}` : ability.title;
+        const abilityDesc = document.createElement('p');
+        abilityDesc.className = 'ability-desc';
+        abilityDesc.textContent = ability.description;
+        bodyEl.append(abilityName, abilityDesc);
+
+        const statsEl = document.createElement('div');
+        statsEl.className = 'unit-stats';
+        const hpEl = document.createElement('span');
+        hpEl.textContent = `HP ${cell.health}`;
+        const staminaEl = document.createElement('span');
+        staminaEl.textContent = `STA ${cell.stamina}/${cell.staminaMax}`;
+        statsEl.append(hpEl, staminaEl);
+
+        cardEl.append(headerEl, bodyEl, statsEl);
+        cellEl.append(cardEl);
+
         cellEl.title = `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
       } else {
         cellEl.title = `(${r},${c}) empty`;
       }
 
-      boardEl.appendChild(cellEl);
+    boardEl.appendChild(cellEl);
     });
   });
 }

@@ -526,6 +526,10 @@ async function buildUnit(card, owner) {
   const abilitySlugs = (card.abilities || [])
     .map((ability) => (typeof ability === 'string' ? ability : ability.slug))
     .filter(Boolean);
+  const abilityDocs = await Promise.all(abilitySlugs.map((slug) => getAbilityBySlug(slug)));
+  const abilityDetails = abilityDocs
+    .filter(Boolean)
+    .map(({ slug, name, description, staminaCost, damage }) => ({ slug, name, description, staminaCost, damage }));
   return {
     owner,
     slug: card.slug,
@@ -536,6 +540,7 @@ async function buildUnit(card, owner) {
     speed: card.stats.speed,
     attackRange: card.stats.attackRange,
     abilities: abilitySlugs,
+    abilityDetails,
     summoningSickness: true,
   };
 }

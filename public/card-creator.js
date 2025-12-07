@@ -59,9 +59,9 @@ function createEffectCard(effect) {
   return effectEl;
 }
 
-function createAbilityCard(ability) {
+function createAbilityCard(ability, { showActions = true, compact = false } = {}) {
   const abilityEl = document.createElement('div');
-  abilityEl.className = 'card ability-card catalog-card';
+  abilityEl.className = `card ability-card catalog-card${compact ? ' compact' : ''}`;
   const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
   const range = Number.isFinite(ability.range) || Number.isFinite(ability.attackRange)
     ? ability.range ?? ability.attackRange
@@ -81,10 +81,14 @@ function createAbilityCard(ability) {
       <span>DMG ${damage}</span>
     </div>
     <p class="muted small-text">Effects: ${formatEffects(ability.effects)}</p>
-    <div class="card-actions">
+    ${
+      showActions
+        ? `<div class="card-actions">
       <button class="ghost" data-edit-ability="${ability.slug}">Edit</button>
       <button class="ghost danger" data-delete-ability="${ability.slug}">Delete</button>
-    </div>
+    </div>`
+        : ''
+    }
   `;
   return abilityEl;
 }
@@ -159,7 +163,9 @@ async function refreshCatalog() {
     const abilityWrapper = document.createElement('div');
     abilityWrapper.className = 'ability-row';
     if (cardAbilities.length) {
-      cardAbilities.forEach((ability) => abilityWrapper.appendChild(createAbilityCard(ability)));
+      cardAbilities.forEach((ability) =>
+        abilityWrapper.appendChild(createAbilityCard(ability, { showActions: false, compact: true }))
+      );
     }
     cardEl.appendChild(abilityWrapper);
 

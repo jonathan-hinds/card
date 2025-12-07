@@ -274,23 +274,23 @@ h1 {
   font-size: 12px;
 }
 
+.board-wrap {
+  position: relative;
+}
+
 .board {
+  --board-cols: 10;
   display: grid;
+  grid-template-columns: repeat(var(--board-cols), minmax(46px, 1fr));
   gap: 6px;
   background: #0b0b0b;
   padding: 8px;
   border: 2px solid var(--border);
 }
 
-.board-row {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
-}
-
 .board-cell {
-  width: 56px;
-  height: 56px;
+  aspect-ratio: 1 / 1;
+  width: 100%;
   border: 2px solid var(--border);
   display: grid;
   place-items: center;
@@ -298,6 +298,7 @@ h1 {
   color: var(--fg);
   font-weight: 700;
   position: relative;
+  cursor: pointer;
 }
 
 .board-cell small {
@@ -306,6 +307,79 @@ h1 {
   right: 4px;
   font-size: 10px;
   color: var(--muted);
+}
+
+.board-cell.owned {
+  border-color: #f7f7f7;
+}
+
+.board-cell.selected {
+  box-shadow: 0 0 0 2px #fff inset;
+}
+
+.board-cell.highlight-move {
+  background: #f7f7f7;
+  color: #000;
+  border-color: #fff;
+}
+
+.board-cell.highlight-range {
+  box-shadow: 0 0 0 2px #202020 inset;
+}
+
+.board-cell.highlight-target {
+  background: repeating-linear-gradient(45deg, #fff, #fff 6px, #000 6px, #000 12px);
+  color: #fff;
+  border-color: #fff;
+}
+
+.action-overlay {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  border: 2px solid var(--border);
+  background: rgba(0, 0, 0, 0.92);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  max-width: 280px;
+}
+
+.action-overlay .overlay-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hand-panel {
+  border: 2px solid var(--border);
+  padding: 12px;
+  background: #0a0a0a;
+  display: grid;
+  gap: 10px;
+}
+
+.hand-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hand-card {
+  border: 2px solid var(--border);
+  padding: 10px 12px;
+  background: #000;
+  color: var(--fg);
+  font-family: 'Space Mono', monospace;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.hand-card.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #191919;
 }
 
 .turn-panel {
@@ -342,11 +416,6 @@ h1 {
 
 @media (max-width: 640px) {
   .board-cell {
-    width: 44px;
-    height: 44px;
-  }
-
-  .board-row {
-    grid-template-columns: repeat(10, 1fr);
+    min-height: 44px;
   }
 }

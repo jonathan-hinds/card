@@ -102,11 +102,7 @@ function renderBoard(board) {
         abilityCost.className = 'ability-cost';
         abilityCost.textContent = ability.cost ? `Cost ${ability.cost}` : '';
 
-        const abilityDesc = document.createElement('p');
-        abilityDesc.className = 'ability-desc';
-        abilityDesc.textContent = ability.description;
-
-        [abilityName, abilityDamage, abilityCost, abilityDesc]
+        [abilityName, abilityDamage, abilityCost]
           .filter((el) => el.textContent)
           .forEach((el) => bodyEl.appendChild(el));
 

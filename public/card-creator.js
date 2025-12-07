@@ -6,6 +6,8 @@ const nameEl = document.getElementById('profile-name');
 const metaEl = document.getElementById('profile-meta');
 const logoutBtn = document.getElementById('logout');
 const cardAbilitySelect = document.getElementById('card-ability');
+const addCardAbilityBtn = document.getElementById('add-card-ability');
+const cardAbilityList = document.getElementById('card-ability-list');
 const abilityList = document.getElementById('ability-list');
 const addAbilityForm = document.getElementById('add-ability-form');
 const abilityEffectSelect = document.getElementById('ability-effects');
@@ -22,6 +24,7 @@ let cards = [];
 let cardEditingSlug = null;
 let abilityEditingSlug = null;
 let effectEditingSlug = null;
+let selectedCardAbilities = [];
 
 function formatEffects(effectSlugs = []) {
   if (!effectSlugs.length) return 'No effects';
@@ -93,6 +96,43 @@ function createAbilityCard(ability, { showActions = true, compact = false } = {}
   return abilityEl;
 }
 
+function getAbilityBySlug(slug) {
+  return abilities.find((ability) => ability.slug === slug);
+}
+
+function renderSelectedCardAbilities() {
+  if (!cardAbilityList) return;
+  cardAbilityList.innerHTML = '';
+
+  if (!selectedCardAbilities.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted small-text';
+    empty.textContent = 'No abilities added';
+    cardAbilityList.appendChild(empty);
+    return;
+  }
+
+  selectedCardAbilities.forEach((slug) => {
+    const ability = getAbilityBySlug(slug);
+    const pill = document.createElement('div');
+    pill.className = 'pill chip';
+    pill.textContent = ability ? ability.name : slug;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'ghost tiny';
+    removeBtn.textContent = '✕';
+    removeBtn.title = 'Remove ability';
+    removeBtn.addEventListener('click', () => {
+      selectedCardAbilities = selectedCardAbilities.filter((item) => item !== slug);
+      renderSelectedCardAbilities();
+    });
+
+    pill.appendChild(removeBtn);
+    cardAbilityList.appendChild(pill);
+  });
+}
+
 async function refreshEffects() {
   const res = await fetch('/api/effects');
   const data = await res.json();
@@ -133,6 +173,8 @@ async function refreshAbilities() {
       cardAbilitySelect.appendChild(opt);
     });
   }
+
+  renderSelectedCardAbilities();
 }
 
 async function refreshCatalog() {
@@ -186,6 +228,17 @@ function setModeLabel(modeEl, slug) {
   modeEl.textContent = slug ? `Editing ${slug}` : 'Create';
 }
 
+if (addCardAbilityBtn) {
+  addCardAbilityBtn.addEventListener('click', () => {
+    const slug = cardAbilitySelect?.value;
+    if (!slug) return;
+    if (selectedCardAbilities.includes(slug)) return;
+    selectedCardAbilities.push(slug);
+    if (cardAbilitySelect) cardAbilitySelect.selectedIndex = 0;
+    renderSelectedCardAbilities();
+  });
+}
+
 addCardForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(addCardForm);
@@ -197,7 +250,7 @@ addCardForm.addEventListener('submit', async (event) => {
       stamina: Number(form.get('stamina')),
       speed: Number(form.get('speed')),
     },
-    abilities: form.get('ability') ? [form.get('ability')] : [],
+    abilities: [...selectedCardAbilities],
   };
   const res = await fetch(cardEditingSlug ? `/api/cards/${cardEditingSlug}` : '/api/cards', {
     method: cardEditingSlug ? 'PUT' : 'POST',
@@ -208,6 +261,8 @@ addCardForm.addEventListener('submit', async (event) => {
   alert(data.message || 'Updated catalog');
   if (res.ok) {
     addCardForm.reset();
+    selectedCardAbilities = [];
+    renderSelectedCardAbilities();
     cardEditingSlug = null;
     setModeLabel(cardMode, null);
     refreshAbilities();
@@ -283,6 +338,8 @@ addAbilityForm.addEventListener('submit', async (event) => {
 
 addCardForm.addEventListener('reset', () => {
   cardEditingSlug = null;
+  selectedCardAbilities = [];
+  renderSelectedCardAbilities();
   setModeLabel(cardMode, null);
 });
 
@@ -347,11 +404,8 @@ function populateCardForm(card) {
   addCardForm.health.value = card.stats?.health ?? '';
   addCardForm.stamina.value = card.stats?.stamina ?? '';
   addCardForm.speed.value = card.stats?.speed ?? '';
-  if (card.abilities?.length) {
-    cardAbilitySelect.value = card.abilities[0];
-  } else {
-    cardAbilitySelect.selectedIndex = 0;
-  }
+  selectedCardAbilities = [...(card.abilities || [])];
+  renderSelectedCardAbilities();
 }
 
 document.body.addEventListener('click', (event) => {

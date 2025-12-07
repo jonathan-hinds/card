@@ -3,6 +3,7 @@ import { authHeaders, getActiveMatch, requireProfile, setActiveMatch, wireLogout
 const joinQueueBtn = document.getElementById('join-queue');
 const leaveQueueBtn = document.getElementById('leave-queue');
 const openBattleBtn = document.getElementById('open-battlefield');
+const practiceBtn = document.getElementById('start-practice');
 const queueStatus = document.getElementById('queue-status');
 const nameEl = document.getElementById('profile-name');
 const metaEl = document.getElementById('profile-meta');
@@ -13,7 +14,10 @@ async function checkStatus() {
   const data = await res.json();
   if (data.match) {
     setActiveMatch(data.match.id);
-    queueStatus.textContent = 'Match found. Open the battlefield to play.';
+    queueStatus.textContent =
+      data.match.mode === 'practice'
+        ? 'Practice match ready. Open the battlefield to spar against yourself.'
+        : 'Match found. Open the battlefield to play.';
   } else if (data.inQueue) {
     queueStatus.textContent = 'Waiting in queue…';
   } else {
@@ -31,6 +35,13 @@ joinQueueBtn.addEventListener('click', async () => {
 leaveQueueBtn.addEventListener('click', async () => {
   const res = await fetch('/api/matchmaking/leave', { method: 'POST', headers: { ...authHeaders() } });
   const data = await res.json();
+  queueStatus.textContent = data.message;
+});
+
+practiceBtn.addEventListener('click', async () => {
+  const res = await fetch('/api/practice/start', { method: 'POST', headers: { ...authHeaders() } });
+  const data = await res.json();
+  if (res.ok && data.match) setActiveMatch(data.match.id);
   queueStatus.textContent = data.message;
 });
 

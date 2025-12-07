@@ -14,11 +14,12 @@ const DATABASE_NAME = process.env.MONGO_DB_NAME || 'card-battles';
 const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
 
 const TARGET_TYPES = new Set(['enemy', 'friendly', 'any']);
-const effectMap = new Map(effectCatalog.map((effect) => [effect.slug, effect]));
+let effectMap = new Map();
 
 let usersCollection;
 let cardsCollection;
 let abilitiesCollection;
+let effectsCollection;
 
 const matchmakingQueue = [];
 const matches = new Map();
@@ -53,8 +54,8 @@ function verifyToken(token) {
 }
 
 async function ensureDatabase() {
-  if (usersCollection && cardsCollection && abilitiesCollection) {
-    return { usersCollection, cardsCollection, abilitiesCollection };
+  if (usersCollection && cardsCollection && abilitiesCollection && effectsCollection) {
+    return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection };
   }
   const client = new MongoClient(MONGO_URI);
   await client.connect();
@@ -62,12 +63,33 @@ async function ensureDatabase() {
   usersCollection = db.collection('players');
   cardsCollection = db.collection('cards');
   abilitiesCollection = db.collection('abilities');
+  effectsCollection = db.collection('effects');
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await cardsCollection.createIndex({ slug: 1 }, { unique: true });
   await abilitiesCollection.createIndex({ slug: 1 }, { unique: true });
+  await effectsCollection.createIndex({ slug: 1 }, { unique: true });
+  await seedEffects(effectsCollection);
+  await refreshEffectCache();
   await seedAbilities(abilitiesCollection);
   await seedCards(cardsCollection);
-  return { usersCollection, cardsCollection, abilitiesCollection };
+  return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection };
+}
+
+async function refreshEffectCache() {
+  const collection = effectsCollection || (await ensureDatabase()).effectsCollection;
+  const effects = await collection.find({}).toArray();
+  effectMap = new Map(effects.map((effect) => [effect.slug, effect]));
+  return effectMap;
+}
+
+async function seedEffects(collection) {
+  for (const effect of effectCatalog) {
+    await collection.updateOne(
+      { slug: effect.slug },
+      { $set: { ...effect }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+  }
 }
 
 async function seedAbilities(collection) {
@@ -334,8 +356,71 @@ app.get('/api/profile', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/effects', (_req, res) => {
-  res.json({ effects: effectCatalog });
+app.get('/api/effects', async (_req, res) => {
+  try {
+    await ensureDatabase();
+    await refreshEffectCache();
+    res.json({ effects: Array.from(effectMap.values()) });
+  } catch (error) {
+    console.error('Effect catalog load error:', error);
+    res.status(500).json({ message: 'Failed to load effects.' });
+  }
+});
+
+app.post('/api/effects', async (req, res) => {
+  const effect = req.body || {};
+  if (!effect.slug || !effect.name) {
+    return res.status(400).json({ message: 'Effect requires slug and name.' });
+  }
+
+  const modifiers = {};
+
+  const staminaChange = req.body.staminaChange;
+  if (staminaChange !== undefined && staminaChange !== '') {
+    const parsed = Number(staminaChange);
+    if (!Number.isFinite(parsed)) {
+      return res.status(400).json({ message: 'Stamina change must be a number.' });
+    }
+    modifiers.staminaChange = parsed;
+  }
+
+  const damageMinRaw = req.body.damageBonusMin;
+  const damageMaxRaw = req.body.damageBonusMax;
+  const hasDamageBonus =
+    (damageMinRaw !== undefined && damageMinRaw !== '') || (damageMaxRaw !== undefined && damageMaxRaw !== '');
+  if (hasDamageBonus) {
+    const min = Number(damageMinRaw || 0);
+    const max = Number(damageMaxRaw || damageMinRaw || 0);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+      return res.status(400).json({ message: 'Damage bonus requires valid min and max.' });
+    }
+    modifiers.damageBonus = { min, max };
+  }
+
+  const targetHint = TARGET_TYPES.has(effect.targetHint) ? effect.targetHint : undefined;
+  const payload = {
+    slug: effect.slug,
+    name: effect.name,
+    type: effect.type || 'neutral',
+    targetHint,
+    description: effect.description,
+    modifiers: Object.keys(modifiers).length ? modifiers : undefined,
+    duration: effect.duration || 'turn',
+    createdAt: new Date(),
+  };
+
+  try {
+    const { effectsCollection: collection } = await ensureDatabase();
+    await collection.insertOne(payload);
+    await refreshEffectCache();
+    res.status(201).json({ message: 'Effect added.' });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Effect slug already exists.' });
+    }
+    console.error('Effect insert error:', error);
+    res.status(500).json({ message: 'Failed to add effect.' });
+  }
 });
 
 app.get('/api/abilities', async (_req, res) => {
@@ -367,6 +452,10 @@ app.post('/api/abilities', async (req, res) => {
     targetType = validateTargetType(ability.targetType);
   } catch (error) {
     return res.status(error.status || 400).json({ message: error.message });
+  }
+
+  if (!effectMap.size) {
+    await refreshEffectCache();
   }
 
   const requestedEffects = Array.isArray(ability.effects)

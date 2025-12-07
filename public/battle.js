@@ -41,17 +41,24 @@ function sideAwareHeaders(extra = {}) {
 function getPrimaryAbility(piece) {
   if (piece?.abilityDetails?.length) {
     const ability = piece.abilityDetails[0];
+    const attackRange = Number.isFinite(ability.range)
+      ? ability.range
+      : Number.isFinite(ability.attackRange)
+        ? ability.attackRange
+        : piece?.attackRange;
     return {
       title: ability.name || ability.slug || 'Ability',
       cost: Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '',
       damage: ability.damage
         ? `${ability.damage.min}-${ability.damage.max}`
         : '',
+      range: Number.isFinite(attackRange) ? `${attackRange}` : '',
       description: ability.description || '—',
     };
   }
   const slug = Array.isArray(piece?.abilities) ? piece.abilities[0] : piece?.abilities;
-  return { title: slug || 'Ability', cost: '', damage: '', description: '—' };
+  const fallbackRange = Number.isFinite(piece?.attackRange) ? `${piece.attackRange}` : '';
+  return { title: slug || 'Ability', cost: '', damage: '', range: fallbackRange, description: '—' };
 }
 
 function resetHighlights() {
@@ -102,17 +109,37 @@ function renderBoard(board) {
         abilityName.className = 'ability-name';
         abilityName.textContent = ability.title;
 
-        const abilityDamage = document.createElement('p');
-        abilityDamage.className = 'ability-damage';
-        abilityDamage.textContent = ability.damage ? `DMG ${ability.damage}` : '';
+        const abilityMeta = document.createElement('div');
+        abilityMeta.className = 'ability-meta';
 
-        const abilityCost = document.createElement('p');
-        abilityCost.className = 'ability-cost';
-        abilityCost.textContent = ability.cost ? `Cost ${ability.cost}` : '';
+        const metaItems = [];
 
-        [abilityName, abilityDamage, abilityCost]
-          .filter((el) => el.textContent)
-          .forEach((el) => bodyEl.appendChild(el));
+        if (ability.damage) {
+          const abilityDamage = document.createElement('span');
+          abilityDamage.className = 'ability-pill ability-damage';
+          abilityDamage.textContent = `DMG ${ability.damage}`;
+          metaItems.push(abilityDamage);
+        }
+
+        if (ability.range) {
+          const abilityRange = document.createElement('span');
+          abilityRange.className = 'ability-pill ability-range';
+          abilityRange.textContent = `RNG ${ability.range}`;
+          metaItems.push(abilityRange);
+        }
+
+        if (ability.cost) {
+          const abilityCost = document.createElement('span');
+          abilityCost.className = 'ability-pill ability-cost';
+          abilityCost.textContent = `COST ${ability.cost}`;
+          metaItems.push(abilityCost);
+        }
+
+        bodyEl.appendChild(abilityName);
+        if (metaItems.length) {
+          metaItems.forEach((el) => abilityMeta.appendChild(el));
+          bodyEl.appendChild(abilityMeta);
+        }
 
         const statsEl = document.createElement('div');
         statsEl.className = 'unit-stats';

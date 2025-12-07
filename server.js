@@ -156,7 +156,7 @@ async function seedCards(collection) {
   };
   await collection.updateOne(
     { slug: grunt.slug },
-    { $set: { ...grunt }, $unset: { 'stats.attackRange': '' }, $setOnInsert: { createdAt: new Date() } },
+    { $set: { ...grunt }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
 }
@@ -731,9 +731,13 @@ app.put('/api/cards/:slug', async (req, res) => {
       setOps.stats = cleanCardStats(stats);
     }
 
-    const updateOps = { $unset: { 'stats.attackRange': '' } };
+    const updateOps = {};
     if (Object.keys(setOps).length) {
       updateOps.$set = setOps;
+    }
+
+    if (!stats) {
+      updateOps.$unset = { 'stats.attackRange': '' };
     }
 
     const result = await collection.updateOne({ slug }, updateOps);

@@ -370,19 +370,16 @@ h1 {
 }
 
 .ability-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  display: grid;
+  gap: 2px;
 }
 
 .ability-pill {
   font-size: 10px;
   line-height: 1.2;
   color: var(--muted);
-  border: 1px solid var(--border);
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
+  display: block;
+  padding: 0;
 }
 
 .ability-desc {

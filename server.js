@@ -423,6 +423,63 @@ app.post('/api/effects', async (req, res) => {
   }
 });
 
+app.put('/api/effects/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const effect = req.body || {};
+  if (!effect.slug || !effect.name) {
+    return res.status(400).json({ message: 'Effect requires slug and name.' });
+  }
+
+  const modifiers = {};
+
+  const staminaChange = req.body.staminaChange;
+  if (staminaChange !== undefined && staminaChange !== '') {
+    const parsed = Number(staminaChange);
+    if (!Number.isFinite(parsed)) {
+      return res.status(400).json({ message: 'Stamina change must be a number.' });
+    }
+    modifiers.staminaChange = parsed;
+  }
+
+  const damageMinRaw = req.body.damageBonusMin;
+  const damageMaxRaw = req.body.damageBonusMax;
+  const hasDamageBonus =
+    (damageMinRaw !== undefined && damageMinRaw !== '') || (damageMaxRaw !== undefined && damageMaxRaw !== '');
+  if (hasDamageBonus) {
+    const min = Number(damageMinRaw || 0);
+    const max = Number(damageMaxRaw || damageMinRaw || 0);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+      return res.status(400).json({ message: 'Damage bonus requires valid min and max.' });
+    }
+    modifiers.damageBonus = { min, max };
+  }
+
+  const targetHint = TARGET_TYPES.has(effect.targetHint) ? effect.targetHint : undefined;
+  const payload = {
+    slug: effect.slug,
+    name: effect.name,
+    type: effect.type || 'neutral',
+    targetHint,
+    description: effect.description,
+    modifiers: Object.keys(modifiers).length ? modifiers : undefined,
+    duration: effect.duration || 'turn',
+    updatedAt: new Date(),
+  };
+
+  try {
+    const { effectsCollection: collection } = await ensureDatabase();
+    const result = await collection.updateOne({ slug }, { $set: payload });
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Effect not found.' });
+    }
+    await refreshEffectCache();
+    res.json({ message: 'Effect updated.' });
+  } catch (error) {
+    console.error('Effect update error:', error);
+    res.status(500).json({ message: 'Failed to update effect.' });
+  }
+});
+
 app.get('/api/abilities', async (_req, res) => {
   try {
     const { abilitiesCollection: collection } = await ensureDatabase();
@@ -488,6 +545,67 @@ app.post('/api/abilities', async (req, res) => {
     }
     console.error('Ability insert error:', error);
     res.status(500).json({ message: 'Failed to add ability.' });
+  }
+});
+
+app.put('/api/abilities/:slug', async (req, res) => {
+  const { slug } = req.params;
+  const ability = req.body || {};
+  if (!ability.slug || !ability.name || typeof ability.staminaCost === 'undefined') {
+    return res.status(400).json({ message: 'Ability requires slug, name, and stamina cost.' });
+  }
+
+  let parsedDamage = null;
+  try {
+    parsedDamage = parseDamage(ability.damage);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message || 'Invalid damage values.' });
+  }
+
+  let targetType;
+  try {
+    targetType = validateTargetType(ability.targetType);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message });
+  }
+
+  if (!effectMap.size) {
+    await refreshEffectCache();
+  }
+
+  const requestedEffects = Array.isArray(ability.effects)
+    ? ability.effects
+    : ability.effects
+      ? [ability.effects]
+      : [];
+
+  const unknownEffects = requestedEffects.filter((effectSlug) => !effectMap.has(effectSlug));
+  if (unknownEffects.length) {
+    return res.status(400).json({ message: `Unknown effects: ${unknownEffects.join(', ')}` });
+  }
+
+  try {
+    const { abilitiesCollection: collection } = await ensureDatabase();
+    const result = await collection.updateOne(
+      { slug },
+      {
+        $set: {
+          ...ability,
+          damage: parsedDamage || undefined,
+          effects: requestedEffects,
+          targetType,
+          staminaCost: Number(ability.staminaCost),
+          updatedAt: new Date(),
+        },
+      }
+    );
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: 'Ability not found.' });
+    }
+    res.json({ message: 'Ability updated.' });
+  } catch (error) {
+    console.error('Ability update error:', error);
+    res.status(500).json({ message: 'Failed to update ability.' });
   }
 });
 

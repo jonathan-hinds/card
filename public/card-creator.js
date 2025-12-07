@@ -63,6 +63,9 @@ function createAbilityCard(ability) {
   const abilityEl = document.createElement('div');
   abilityEl.className = 'card ability-card catalog-card';
   const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
+  const range = Number.isFinite(ability.range) || Number.isFinite(ability.attackRange)
+    ? ability.range ?? ability.attackRange
+    : '—';
   abilityEl.innerHTML = `
     <div class="card-header">
       <div>
@@ -71,7 +74,7 @@ function createAbilityCard(ability) {
       </div>
       <p class="pill">${ability.slug}</p>
     </div>
-    <p>Damage ${damage}</p>
+    <p>Damage ${damage} · Range ${range}</p>
     <p class="muted">Effects: ${formatEffects(ability.effects)}</p>
     <p class="muted">${ability.description || 'No description'}</p>
     <div class="card-actions">
@@ -183,7 +186,6 @@ addCardForm.addEventListener('submit', async (event) => {
       health: Number(form.get('health')),
       stamina: Number(form.get('stamina')),
       speed: Number(form.get('speed')),
-      attackRange: Number(form.get('range')),
     },
     abilities: form.get('ability') ? [form.get('ability')] : [],
   };
@@ -246,6 +248,7 @@ addAbilityForm.addEventListener('submit', async (event) => {
     name: form.get('name'),
     damage: hasDamage ? { min: Number(minDmg || 0), max: Number(maxDmg || minDmg || 0) } : undefined,
     staminaCost: Number(form.get('staminaCost')),
+    range: Number(form.get('range')),
     targetType: form.get('targetType') || 'enemy',
     effects: effectsSelection,
     description: form.get('description'),
@@ -318,6 +321,7 @@ function populateAbilityForm(ability) {
   addAbilityForm.min.value = ability.damage?.min ?? '';
   addAbilityForm.max.value = ability.damage?.max ?? '';
   addAbilityForm.staminaCost.value = ability.staminaCost;
+  addAbilityForm.range.value = ability.range ?? ability.attackRange ?? '';
   addAbilityForm.targetType.value = ability.targetType || 'enemy';
   Array.from(abilityEffectSelect.options).forEach((opt) => {
     opt.selected = ability.effects?.includes(opt.value) || false;
@@ -333,7 +337,6 @@ function populateCardForm(card) {
   addCardForm.health.value = card.stats?.health ?? '';
   addCardForm.stamina.value = card.stats?.stamina ?? '';
   addCardForm.speed.value = card.stats?.speed ?? '';
-  addCardForm.range.value = card.stats?.attackRange ?? '';
   if (card.abilities?.length) {
     cardAbilitySelect.value = card.abilities[0];
   } else {

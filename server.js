@@ -98,6 +98,7 @@ async function seedAbilities(collection) {
     name: 'Basic Attack',
     staminaCost: 1,
     damage: { min: 1, max: 3 },
+    range: 1,
     description: 'Strike a nearby foe using the unit\'s basic training.',
     targetType: 'enemy',
     effects: [],
@@ -108,6 +109,7 @@ async function seedAbilities(collection) {
     name: 'Battle Focus',
     staminaCost: 1,
     description: 'Bolster an ally for the current turn with extra damage.',
+    range: 1,
     targetType: 'friendly',
     effects: ['damage-boost-turn'],
   };
@@ -117,6 +119,7 @@ async function seedAbilities(collection) {
     name: 'Fatigue',
     staminaCost: 1,
     description: 'Sap an enemy\'s stamina for the rest of the turn.',
+    range: 1,
     targetType: 'enemy',
     effects: ['stamina-sapped-turn'],
   };
@@ -148,13 +151,12 @@ async function seedCards(collection) {
       health: 10,
       stamina: 3,
       speed: 1,
-      attackRange: 1,
     },
     abilities: ['basic-attack'],
   };
   await collection.updateOne(
     { slug: grunt.slug },
-    { $set: { ...grunt }, $setOnInsert: { createdAt: new Date() } },
+    { $set: { ...grunt }, $unset: { 'stats.attackRange': '' }, $setOnInsert: { createdAt: new Date() } },
     { upsert: true }
   );
 }
@@ -193,6 +195,27 @@ function validateTargetType(targetType) {
   return value;
 }
 
+function parseRange(range) {
+  const value = range === undefined || range === null || range === '' ? 1 : Number(range);
+  if (!Number.isFinite(value) || value < 0) {
+    throw Object.assign(new Error('Range must be zero or greater.'), { status: 400 });
+  }
+  return value;
+}
+
+function cleanCardStats(stats) {
+  const { attackRange, ...rest } = stats || {};
+  const toNumber = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : 0;
+  };
+  return {
+    health: toNumber(rest.health),
+    stamina: toNumber(rest.stamina),
+    speed: toNumber(rest.speed),
+  };
+}
+
 function buildActiveEffect(effect, turnOwner) {
   return {
     slug: effect.slug,
@@ -220,13 +243,6 @@ function canMovePiece(piece, from, to) {
   const colDiff = Math.abs(from.col - to.col);
   const distance = Math.max(rowDiff, colDiff);
   return distance <= piece.speed;
-}
-
-function withinRange(attacker, from, to) {
-  const rowDiff = Math.abs(from.row - to.row);
-  const colDiff = Math.abs(from.col - to.col);
-  const distance = Math.max(rowDiff, colDiff);
-  return distance <= attacker.attackRange;
 }
 
 async function loadPlayer(username) {
@@ -510,6 +526,7 @@ app.get('/api/abilities', async (_req, res) => {
 
 app.post('/api/abilities', async (req, res) => {
   const ability = req.body || {};
+  const { attackRange, ...abilityPayload } = ability;
   if (!ability.slug || !ability.name || typeof ability.staminaCost === 'undefined') {
     return res.status(400).json({ message: 'Ability requires slug, name, and stamina cost.' });
   }
@@ -524,6 +541,13 @@ app.post('/api/abilities', async (req, res) => {
   let targetType;
   try {
     targetType = validateTargetType(ability.targetType);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message });
+  }
+
+  let range;
+  try {
+    range = parseRange(ability.range ?? attackRange);
   } catch (error) {
     return res.status(error.status || 400).json({ message: error.message });
   }
@@ -548,10 +572,11 @@ app.post('/api/abilities', async (req, res) => {
   try {
     const { abilitiesCollection: collection } = await ensureDatabase();
     await collection.insertOne({
-      ...ability,
+      ...abilityPayload,
       damage: parsedDamage || undefined,
       effects: requestedEffects,
       targetType,
+      range,
       staminaCost: Number(ability.staminaCost),
       createdAt: new Date(),
     });
@@ -568,6 +593,7 @@ app.post('/api/abilities', async (req, res) => {
 app.put('/api/abilities/:slug', async (req, res) => {
   const { slug } = req.params;
   const ability = req.body || {};
+  const { attackRange, ...abilityPayload } = ability;
   if (!ability.slug || !ability.name || typeof ability.staminaCost === 'undefined') {
     return res.status(400).json({ message: 'Ability requires slug, name, and stamina cost.' });
   }
@@ -582,6 +608,13 @@ app.put('/api/abilities/:slug', async (req, res) => {
   let targetType;
   try {
     targetType = validateTargetType(ability.targetType);
+  } catch (error) {
+    return res.status(error.status || 400).json({ message: error.message });
+  }
+
+  let range;
+  try {
+    range = parseRange(ability.range ?? attackRange);
   } catch (error) {
     return res.status(error.status || 400).json({ message: error.message });
   }
@@ -607,13 +640,15 @@ app.put('/api/abilities/:slug', async (req, res) => {
       { slug },
       {
         $set: {
-          ...ability,
+          ...abilityPayload,
           damage: parsedDamage || undefined,
           effects: requestedEffects,
           targetType,
+          range,
           staminaCost: Number(ability.staminaCost),
           updatedAt: new Date(),
         },
+        $unset: { attackRange: '' },
       }
     );
     if (result.matchedCount === 0) {
@@ -652,6 +687,7 @@ app.get('/api/cards', async (_req, res) => {
     const abilityMap = new Map(abilities.map((ability) => [ability.slug, ability]));
     const enriched = cards.map((card) => ({
       ...card,
+      stats: cleanCardStats(card.stats),
       abilityDetails: (card.abilities || [])
         .map((slug) => (typeof slug === 'string' ? abilityMap.get(slug) : slug))
         .filter(Boolean),
@@ -671,7 +707,8 @@ app.post('/api/cards', async (req, res) => {
 
   try {
     const { cardsCollection: collection } = await ensureDatabase();
-    await collection.insertOne({ ...card, createdAt: new Date() });
+    const payload = { ...card, stats: cleanCardStats(card.stats), createdAt: new Date() };
+    await collection.insertOne(payload);
     res.status(201).json({ message: 'Card added.' });
   } catch (error) {
     if (error.code === 11000) {
@@ -688,7 +725,18 @@ app.put('/api/cards/:slug', async (req, res) => {
 
   try {
     const { cardsCollection: collection } = await ensureDatabase();
-    const result = await collection.updateOne({ slug }, { $set: updates });
+    const { stats, ...rest } = updates;
+    const setOps = { ...rest };
+    if (stats) {
+      setOps.stats = cleanCardStats(stats);
+    }
+
+    const updateOps = { $unset: { 'stats.attackRange': '' } };
+    if (Object.keys(setOps).length) {
+      updateOps.$set = setOps;
+    }
+
+    const result = await collection.updateOne({ slug }, updateOps);
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: 'Card not found.' });
     }
@@ -1042,24 +1090,33 @@ async function buildUnit(card, owner) {
   const abilityDocs = await Promise.all(abilitySlugs.map((slug) => getAbilityBySlug(slug)));
   const abilityDetails = abilityDocs
     .filter(Boolean)
-    .map(({ slug, name, description, staminaCost, damage, targetType, effects }) => ({
-      slug,
-      name,
-      description,
-      staminaCost,
-      damage,
-      targetType: validateTargetType(targetType),
-      effects: effects || [],
-    }));
+    .map((ability) => {
+      let abilityRange = 1;
+      try {
+        abilityRange = parseRange(ability.range ?? ability.attackRange);
+      } catch (error) {
+        console.warn(`Invalid range for ability ${ability.slug}:`, error.message);
+      }
+      return {
+        slug: ability.slug,
+        name: ability.name,
+        description: ability.description,
+        staminaCost: ability.staminaCost,
+        damage: ability.damage,
+        range: abilityRange,
+        targetType: validateTargetType(ability.targetType),
+        effects: ability.effects || [],
+      };
+    });
+  const stats = cleanCardStats(card.stats);
   return {
     owner,
     slug: card.slug,
     name: card.name,
-    health: card.stats.health,
-    stamina: card.stats.stamina,
-    staminaMax: card.stats.stamina,
-    speed: card.stats.speed,
-    attackRange: card.stats.attackRange,
+    health: stats.health,
+    stamina: stats.stamina,
+    staminaMax: stats.stamina,
+    speed: stats.speed,
     abilities: abilitySlugs,
     abilityDetails,
     summoningSickness: true,
@@ -1179,7 +1236,12 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       throw Object.assign(new Error('This ability targets friendly units.'), { status: 400 });
     }
 
-    const attackRange = Number.isFinite(ability.range) ? ability.range : attacker.attackRange;
+    let attackRange;
+    try {
+      attackRange = parseRange(ability.range ?? ability.attackRange);
+    } catch (error) {
+      throw Object.assign(new Error('Invalid ability range.'), { status: 400 });
+    }
     const rowDiff = Math.abs(fromRow - targetRow);
     const colDiff = Math.abs(fromCol - targetCol);
     const distance = Math.max(rowDiff, colDiff);

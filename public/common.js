@@ -66,15 +66,18 @@ export function wireLogout(button) {
 }
 
 export function formatStats(card) {
-  return `HP ${card.stats.health} · Sta ${card.stats.stamina} · Spd ${card.stats.speed} · RNG ${card.stats.attackRange}`;
+  return `HP ${card.stats.health} · Sta ${card.stats.stamina} · Spd ${card.stats.speed}`;
 }
 
 export function formatAbility(ability) {
   if (!ability) return 'Unknown ability';
   const damage = ability.damage ? `${ability.damage.min}-${ability.damage.max}` : '—';
   const target = ability.targetType ? ` · Target ${ability.targetType}` : '';
+  const range = Number.isFinite(ability.range) || Number.isFinite(ability.attackRange)
+    ? ` · Range ${ability.range ?? ability.attackRange}`
+    : '';
   const effectCount = ability.effects?.length ? ` · Effects ${ability.effects.length}` : '';
-  return `${ability.name} · DMG ${damage} · Cost ${ability.staminaCost} STA${target}${effectCount}`;
+  return `${ability.name} · DMG ${damage} · Cost ${ability.staminaCost} STA${range}${target}${effectCount}`;
 }
 
 export function summarizeAbilities(abilities = []) {

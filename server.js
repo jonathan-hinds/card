@@ -55,8 +55,14 @@ function verifyToken(token) {
 }
 
 async function ensureDatabase() {
-  if (usersCollection && cardsCollection && abilitiesCollection && effectsCollection) {
-    return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection };
+  if (
+    usersCollection &&
+    cardsCollection &&
+    abilitiesCollection &&
+    effectsCollection &&
+    npcMemoryCollection
+  ) {
+    return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection, npcMemoryCollection };
   }
   const client = new MongoClient(MONGO_URI);
   await client.connect();
@@ -75,7 +81,7 @@ async function ensureDatabase() {
   await refreshEffectCache();
   await seedAbilities(abilitiesCollection);
   await seedCards(cardsCollection);
-  return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection };
+  return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection, npcMemoryCollection };
 }
 
 async function loadNpcMemory() {

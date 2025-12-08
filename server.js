@@ -1640,6 +1640,20 @@ app.post('/api/matches/:id/end-turn', requireAuth, async (req, res) => {
     const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
     if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
+
+    if (match.mode === 'npc' && match.turn === match.npc?.name && actingPlayer !== match.turn) {
+      await runNpcTurn(match);
+
+      if (match.mode === 'npc' && match.status === 'complete') {
+        await recordNpcMemory(match);
+      }
+
+      return res.json({
+        match: summarizeMatch(match, actingPlayer),
+        message: 'NPC completed its pending turn.',
+      });
+    }
+
     ensureTurn(match, actingPlayer);
 
     endTurn(match, actingPlayer);

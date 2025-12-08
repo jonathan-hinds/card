@@ -1309,7 +1309,9 @@ async function npcAttack(match, npcName, position) {
 
   const damageFragment = damage > 0 ? ` for ${damage} damage` : '';
   const effectFragment = effectSummary ? ` and applied ${effectSummary}` : '';
-  match.log.push(`${npcName}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment}.`);
+  match.log.push(
+    `${npcName}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment} on ${target.unit.owner}'s ${target.unit.name}.`
+  );
 
   if (target.unit.health <= 0) {
     match.board[target.row][target.col] = null;
@@ -1619,7 +1621,9 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
 
     const damageFragment = roll > 0 ? ` for ${roll} damage` : '';
     const effectFragment = effectSummary ? ` and applied ${effectSummary}` : '';
-    match.log.push(`${actingPlayer}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment}.`);
+    match.log.push(
+      `${actingPlayer}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment} on ${target.owner}'s ${target.name}.`
+    );
 
     if (target.health <= 0) {
       match.board[targetRow][targetCol] = null;

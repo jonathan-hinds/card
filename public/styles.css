@@ -800,6 +800,85 @@ h1 {
   background: #000;
   min-height: 80px;
   font-size: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.event-card {
+  border: 1px solid var(--border);
+  background: #0b0b0b;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.event-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-card__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.event-card__action {
+  font-weight: 700;
+}
+
+.event-card__participants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.event-card__participants .event-card__arrow {
+  display: none;
+}
+
+.event-card__participants--has-target {
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.event-card__participants--has-target .event-card__arrow {
+  display: flex;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.event-participant {
+  border: 1px solid var(--border);
+  padding: 8px;
+  background: #050505;
+  display: grid;
+  gap: 2px;
+}
+
+.event-participant__label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.event-participant__player {
+  font-weight: 700;
+}
+
+.event-participant__unit {
+  color: var(--muted);
+}
+
+.event-card__detail {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .foot {

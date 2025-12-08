@@ -10,6 +10,7 @@ const boardEl = document.getElementById('board');
 const logEl = document.getElementById('log');
 const turnIndicator = document.getElementById('turn-indicator');
 const endTurnBtn = document.getElementById('end-turn');
+const leaveMatchBtn = document.getElementById('leave-match');
 const nameEl = document.getElementById('profile-name');
 const metaEl = document.getElementById('profile-meta');
 const logoutBtn = document.getElementById('logout');
@@ -289,43 +290,40 @@ function parseLogLine(line) {
 }
 
 function buildParticipant(label, participant) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'event-participant';
+  const wrapper = document.createElement('span');
+  wrapper.className = 'event-chip';
 
-  const tag = document.createElement('p');
-  tag.className = 'event-participant__label';
+  const tag = document.createElement('span');
+  tag.className = 'event-chip__label';
   tag.textContent = label;
 
-  const player = document.createElement('p');
-  player.className = 'event-participant__player';
-  player.textContent = participant.player || '—';
+  const summary = document.createElement('strong');
+  summary.textContent = participant.unit
+    ? `${participant.player} · ${participant.unit}`
+    : participant.player || '—';
 
-  const unit = document.createElement('p');
-  unit.className = 'event-participant__unit';
-  unit.textContent = participant.unit || '—';
-
-  wrapper.append(tag, player, unit);
+  wrapper.append(tag, summary);
   return wrapper;
 }
 
 function renderLog(lines) {
   logEl.innerHTML = '';
   (lines || [])
-    .slice(-8)
+    .slice(-12)
     .map((line) => parseLogLine(line))
     .forEach((event) => {
       const card = document.createElement('article');
-      card.className = `event-card event-${event.type}`;
+      card.className = `event-row event-${event.type}`;
 
       const header = document.createElement('div');
-      header.className = 'event-card__header';
+      header.className = 'event-row__header';
       const title = document.createElement('span');
-      title.className = 'event-card__label';
+      title.className = 'event-row__label';
       title.textContent = event.title;
       header.appendChild(title);
       if (event.action) {
         const action = document.createElement('span');
-        action.className = 'event-card__action';
+        action.className = 'event-row__action';
         action.textContent = event.action;
         header.appendChild(action);
       }
@@ -333,23 +331,15 @@ function renderLog(lines) {
 
       if (event.actor || event.target) {
         const participants = document.createElement('div');
-        participants.className = 'event-card__participants';
-        const hasArrow = Boolean(event.actor && event.target);
-        participants.classList.toggle('event-card__participants--has-target', hasArrow);
-        if (event.actor) participants.appendChild(buildParticipant('Initiator', event.actor));
-        if (hasArrow) {
-          const arrow = document.createElement('span');
-          arrow.className = 'event-card__arrow';
-          arrow.textContent = '→';
-          participants.appendChild(arrow);
-        }
+        participants.className = 'event-row__participants';
+        if (event.actor) participants.appendChild(buildParticipant('Actor', event.actor));
         if (event.target) participants.appendChild(buildParticipant('Target', event.target));
         card.appendChild(participants);
       }
 
       if (event.detail) {
         const detail = document.createElement('p');
-        detail.className = 'event-card__detail';
+        detail.className = 'event-row__detail';
         detail.textContent = event.detail;
         card.appendChild(detail);
       }
@@ -485,9 +475,19 @@ function renderMatch(match) {
   renderBoard(match.board);
   renderLog(match.log);
   turnIndicator.textContent = match.turn;
+  const isActive = match.status === 'active';
+  boardEl.classList.toggle('board--inactive', !isActive);
+  handEl.classList.toggle('hand-row--inactive', !isActive);
+  endTurnBtn.disabled = !isActive;
   const hand = match.hands ? match.hands[currentSide] || [] : [];
   renderHand(hand);
   updateOverlay();
+  if (!isActive) {
+    setActiveMatch('');
+    metaEl.textContent = match.defeated
+      ? `${match.defeated} has been defeated. Match closed.`
+      : 'Match finished.';
+  }
 }
 
 async function syncMatch() {
@@ -497,6 +497,9 @@ async function syncMatch() {
   const data = await res.json();
   if (res.ok && data.match) {
     renderMatch(data.match);
+  } else if (res.status === 404) {
+    setActiveMatch('');
+    metaEl.textContent = 'Match no longer available.';
   }
 }
 
@@ -619,7 +622,7 @@ async function attackTarget(targetRow, targetCol, abilitySlug = '') {
 
 boardEl.addEventListener('click', (event) => {
   const cellEl = event.target.closest('.board-cell');
-  if (!cellEl || !activeMatch) return;
+  if (!cellEl || !activeMatch || activeMatch.status !== 'active') return;
   const row = Number(cellEl.dataset.row);
   const col = Number(cellEl.dataset.col);
   const key = coordKey(row, col);
@@ -647,7 +650,7 @@ boardEl.addEventListener('click', (event) => {
 });
 
 moveBtn.addEventListener('click', () => {
-  if (!selectedUnit) return;
+  if (!selectedUnit || activeMatch?.status !== 'active') return;
   const piece = activeMatch.board[selectedUnit.row][selectedUnit.col];
   const spaces = calculateMoves(piece, selectedUnit);
   resetHighlights();
@@ -680,11 +683,35 @@ sideSelector.addEventListener('change', () => {
 });
 
 endTurnBtn.addEventListener('click', async () => {
-  if (!activeMatch) return;
+  if (!activeMatch || activeMatch.status !== 'active') return;
   const res = await fetch(`/api/matches/${activeMatch.id}/end-turn`, { method: 'POST', headers: sideAwareHeaders() });
   const data = await res.json();
   if (res.ok) renderMatch(data.match);
   metaEl.textContent = data.message || 'Turn ended';
+});
+
+leaveMatchBtn.addEventListener('click', async () => {
+  if (!activeMatch) {
+    setActiveMatch('');
+    window.location.href = '/play.html';
+    return;
+  }
+
+  const res = await fetch(`/api/matches/${activeMatch.id}/leave`, {
+    method: 'POST',
+    headers: sideAwareHeaders(),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    setActiveMatch('');
+    renderMatch(data.match || activeMatch);
+    metaEl.textContent = data.message || 'Match closed.';
+    setTimeout(() => {
+      window.location.href = '/play.html';
+    }, 500);
+  } else {
+    metaEl.textContent = data.message || 'Unable to leave match.';
+  }
 });
 
 async function init() {
@@ -701,6 +728,7 @@ async function init() {
     setActiveMatch(data.match.id);
     renderMatch(data.match);
   } else {
+    setActiveMatch('');
     metaEl.textContent = 'No active match. Return to matchmaking.';
   }
 

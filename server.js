@@ -1106,7 +1106,7 @@ app.post('/api/npc/start', requireAuth, async (req, res) => {
 
 function findMatchForPlayer(player) {
   for (const match of matches.values()) {
-    if (match.players.includes(player)) return match;
+    if (match.players.includes(player) && match.status === 'active') return match;
   }
   return null;
 }
@@ -1135,6 +1135,27 @@ app.get('/api/matchmaking/status', requireAuth, (req, res) => {
   res.json({ inQueue, match: match ? summarizeMatch(match, req.player) : null });
 });
 
+app.post('/api/matches/:id/leave', requireAuth, async (req, res) => {
+  try {
+    const match = matches.get(req.params.id);
+    if (!match) return res.status(404).json({ message: 'Match not found.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
+
+    const opponent = opponentOf(match, actingPlayer);
+    completeMatch(match, actingPlayer, `${actingPlayer} forfeited. ${opponent} wins by default.`);
+
+    if (match.mode === 'npc' && match.status === 'complete') {
+      await recordNpcMemory(match);
+    }
+
+    res.json({ message: 'Match closed.', match: summarizeMatch(match, actingPlayer) });
+  } catch (error) {
+    console.error('Leave match error:', error.message);
+    res.status(error.status || 500).json({ message: error.message || 'Failed to leave match.' });
+  }
+});
+
 function ensureTurn(match, player) {
   if (match.turn !== player) {
     const err = new Error('Not your turn.');
@@ -1149,6 +1170,13 @@ function ensureActive(match) {
     err.status = 400;
     throw err;
   }
+}
+
+function completeMatch(match, defeated, reason) {
+  if (match.status === 'complete') return;
+  match.status = 'complete';
+  match.defeated = defeated ?? match.defeated ?? null;
+  if (reason) match.log.push(reason);
 }
 
 function opponentOf(match, player) {
@@ -1412,9 +1440,7 @@ function defeatIfEmpty(match, opponent) {
   const boardCount = match.boardPieces[opponent];
   const handCount = (match.hands[opponent] || []).reduce((sum, entry) => sum + entry.count, 0);
   if (boardCount + handCount === 0) {
-    match.status = 'complete';
-    match.defeated = opponent;
-    match.log.push(`${opponent} has no remaining units. ${match.turn} wins.`);
+    completeMatch(match, opponent, `${opponent} has no remaining units. ${match.turn} wins.`);
   }
 }
 

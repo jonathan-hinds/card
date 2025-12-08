@@ -288,6 +288,56 @@ function buildActiveEffect(effect, turnOwner) {
   };
 }
 
+function territoryAssignments(match) {
+  const totalRows = match.board?.length || gameConfig.board.rows;
+  const half = Math.floor(totalRows / 2);
+  const assignments = {};
+  const [northPlayer, southPlayer] = match.players;
+
+  if (northPlayer) {
+    assignments[northPlayer] = { side: 'north', rows: { start: 0, end: Math.max(0, half - 1) } };
+  }
+
+  if (southPlayer) {
+    assignments[southPlayer] = {
+      side: 'south',
+      rows: { start: Math.max(0, totalRows - half), end: Math.max(0, totalRows - 1) },
+    };
+  }
+
+  return assignments;
+}
+
+function isHomeTerritory(match, player, position) {
+  if (!match || !player || position?.row === undefined) return false;
+  const assignments = territoryAssignments(match);
+  const territory = assignments[player];
+  if (!territory) return false;
+  return position.row >= territory.rows.start && position.row <= territory.rows.end;
+}
+
+function updatePieceTerritory(match, position, piece) {
+  if (!piece) return;
+  piece.enemyTerritory = !isHomeTerritory(match, piece.owner, position);
+}
+
+function refreshPieceTerritories(match) {
+  if (!match?.board) return;
+  match.board.forEach((row, r) => {
+    row.forEach((cell) => updatePieceTerritory(match, { row: r }, cell));
+  });
+}
+
+function effectiveActionCost(piece, baseCost = 1) {
+  const surcharge = piece?.enemyTerritory ? 1 : 0;
+  return Math.max(0, baseCost + surcharge);
+}
+
+function abilityStaminaCost(piece, ability) {
+  const baseCost = ability?.staminaCost ?? 1;
+  return effectiveActionCost(piece, baseCost);
+}
+
 function createEmptyBoard() {
   const { rows, cols } = gameConfig.board;
   const board = [];
@@ -354,6 +404,9 @@ function remainingPieces(playerState) {
 
 function summarizeMatch(match, viewer) {
   const maskHand = (hand) => hand.map((card) => ({ slug: card.slug, count: card.count }));
+  refreshPieceTerritories(match);
+  const territories = territoryAssignments(match);
+  const viewerTerritory = territories[viewer] || territories[match.players[0]] || null;
   const view = {
     id: match.id,
     players: match.players,
@@ -365,6 +418,12 @@ function summarizeMatch(match, viewer) {
     status: match.status,
     log: match.log,
     defeated: match.defeated,
+    territories,
+    perspective: {
+      homeSide: viewerTerritory?.side || 'south',
+      flipped: viewerTerritory?.side === 'north',
+      homeRows: viewerTerritory?.rows || null,
+    },
   };
   if (viewer === match.players[0] || viewer === match.players[1]) {
     view.hands = {
@@ -1228,18 +1287,20 @@ function findNearestEnemy(match, owner, from) {
   return best;
 }
 
-function findEmptyCells(match) {
+function findEmptyCells(match, owner = null) {
   const cells = [];
   match.board.forEach((row, r) => {
     row.forEach((cell, c) => {
-      if (!cell) cells.push({ row: r, col: c });
+      if (cell) return;
+      if (owner && !isHomeTerritory(match, owner, { row: r, col: c })) return;
+      cells.push({ row: r, col: c });
     });
   });
   return cells;
 }
 
-function choosePlacementCell(match, target, aggression = 1) {
-  const empties = findEmptyCells(match);
+function choosePlacementCell(match, target, aggression = 1, owner = null) {
+  const empties = findEmptyCells(match, owner);
   if (!empties.length) return null;
   if (!target) return empties[Math.floor(Math.random() * empties.length)];
 
@@ -1264,12 +1325,13 @@ async function npcPlaceCard(match) {
   const targetEnemy = findNearestEnemy(match, npcName, { row: 0, col: 0 });
   const memory = await loadNpcMemory();
   const aggression = 1 + (memory.totalDamageDealt - memory.totalDamageTaken) / Math.max(1, memory.totalBattles || 1);
-  const cell = choosePlacementCell(match, targetEnemy, aggression);
+  const cell = choosePlacementCell(match, targetEnemy, aggression, npcName);
   if (!cell) return false;
 
   const unit = await buildUnit(card, npcName);
   drawCardFromHand(hand, available.slug);
   match.board[cell.row][cell.col] = unit;
+  updatePieceTerritory(match, cell, unit);
   match.turnPlays += 1;
   match.boardPieces[npcName] += 1;
   match.log.push(`${npcName} deployed ${card.name} to (${cell.row},${cell.col}).`);
@@ -1293,9 +1355,13 @@ function npcMoveToward(match, npcName, position) {
   if (nextCol < 0 || nextCol >= match.board[0].length) return false;
   if (match.board[nextRow][nextCol]) return false;
 
+  const moveCost = effectiveActionCost(unit, 1);
+  if (unit.stamina < moveCost) return false;
+
   match.board[nextRow][nextCol] = unit;
   match.board[row][col] = null;
-  unit.stamina -= 1;
+  unit.stamina -= moveCost;
+  updatePieceTerritory(match, { row: nextRow, col: nextCol }, unit);
   match.log.push(`${npcName} advanced ${unit.name} to (${nextRow},${nextCol}).`);
   return true;
 }
@@ -1317,7 +1383,8 @@ async function npcAttack(match, npcName, position) {
   const abilitySlug = attacker.abilities?.[0];
   const ability = attacker.abilityDetails?.find((a) => a.slug === abilitySlug) || attacker.abilityDetails?.[0];
   if (!ability) return false;
-  if (attacker.stamina < (ability.staminaCost ?? 1)) return false;
+  const staminaCost = abilityStaminaCost(attacker, ability);
+  if (attacker.stamina < staminaCost) return false;
 
   const target = npcAbilityTarget(match, npcName, position, ability);
   if (!target) return false;
@@ -1327,7 +1394,7 @@ async function npcAttack(match, npcName, position) {
     target.unit.health -= damage;
     if (match.mode === 'npc') match.npcStats.damageDealt += damage;
   }
-  attacker.stamina -= ability.staminaCost ?? 1;
+  attacker.stamina -= staminaCost;
   applyAbilityEffects(ability, target.unit, match, match.log);
 
   const effectSummary = (ability.effects || [])
@@ -1482,6 +1549,7 @@ async function buildUnit(card, owner) {
     abilityDetails,
     summoningSickness: true,
     activeEffects: [],
+    enemyTerritory: false,
   };
 }
 
@@ -1515,6 +1583,9 @@ app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
     const { row, col, cardSlug } = req.body || {};
     assertCell(match, row, col);
     if (match.board[row][col]) throw Object.assign(new Error('Cell occupied.'), { status: 400 });
+    if (!isHomeTerritory(match, actingPlayer, { row, col })) {
+      throw Object.assign(new Error('Deployments must stay on your side of the board.'), { status: 400 });
+    }
     if (match.turnPlays >= 1) throw Object.assign(new Error('Only one card can be played each turn.'), { status: 400 });
 
     const hand = match.hands[actingPlayer] || [];
@@ -1526,6 +1597,7 @@ app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
     const unit = await buildUnit(card, actingPlayer);
 
     match.board[row][col] = unit;
+    updatePieceTerritory(match, { row, col }, unit);
     match.turnPlays += 1;
     match.boardPieces[actingPlayer] += 1;
     match.log.push(`${actingPlayer} deployed ${card.name} to (${row},${col}).`);
@@ -1552,7 +1624,8 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
     const piece = match.board[fromRow][fromCol];
     if (!piece || piece.owner !== actingPlayer) throw Object.assign(new Error('No piece to move.'), { status: 400 });
     if (piece.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
-    if (piece.stamina <= 0) throw Object.assign(new Error('No stamina left to move.'), { status: 400 });
+    const moveCost = effectiveActionCost(piece, 1);
+    if (piece.stamina < moveCost) throw Object.assign(new Error('Not enough stamina to move.'), { status: 400 });
     if (!canMovePiece(piece, { row: fromRow, col: fromCol }, { row: toRow, col: toCol })) {
       throw Object.assign(new Error('Move exceeds speed.'), { status: 400 });
     }
@@ -1560,7 +1633,8 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
 
     match.board[toRow][toCol] = piece;
     match.board[fromRow][fromCol] = null;
-    piece.stamina -= 1;
+    piece.stamina -= moveCost;
+    updatePieceTerritory(match, { row: toRow, col: toCol }, piece);
     match.log.push(`${actingPlayer} moved ${piece.name} to (${toRow},${toCol}).`);
 
     res.json({ match: summarizeMatch(match, actingPlayer) });
@@ -1620,7 +1694,8 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       throw Object.assign(new Error('Target out of range.'), { status: 400 });
     }
 
-    if (attacker.stamina < ability.staminaCost) {
+    const staminaCost = abilityStaminaCost(attacker, ability);
+    if (attacker.stamina < staminaCost) {
       throw Object.assign(new Error('Not enough stamina.'), { status: 400 });
     }
 
@@ -1637,7 +1712,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
         }
       }
     }
-    attacker.stamina -= ability.staminaCost;
+    attacker.stamina -= staminaCost;
     applyAbilityEffects(ability, target, match, match.log);
 
     const effectSummary = (ability.effects || [])

@@ -34,6 +34,47 @@ const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
 
+function perspective() {
+  return activeMatch?.perspective || { flipped: false, homeRows: null };
+}
+
+function boardCoordsFromView(row, col) {
+  const { rows, cols } = boardSize();
+  if (!perspective().flipped) return { row, col };
+  return { row: rows - 1 - row, col: cols - 1 - col };
+}
+
+function boardCoordsToView(row, col) {
+  const { rows, cols } = boardSize();
+  if (!perspective().flipped) return { row, col };
+  return { row: rows - 1 - row, col: cols - 1 - col };
+}
+
+function homeTerritory() {
+  if (!currentSide || !activeMatch?.territories) return null;
+  return activeMatch.territories[currentSide] || null;
+}
+
+function isHomeRow(row) {
+  const territory = homeTerritory();
+  if (!territory?.rows) return false;
+  return row >= territory.rows.start && row <= territory.rows.end;
+}
+
+function formattedCoords(position) {
+  const coords = boardCoordsToView(position.row, position.col);
+  return `(${coords.row},${coords.col})`;
+}
+
+function moveCost(piece) {
+  return 1 + (piece?.enemyTerritory ? 1 : 0);
+}
+
+function abilityCost(piece, ability) {
+  const base = Number.isFinite(ability?.staminaCost) ? ability.staminaCost : 1;
+  return base + (piece?.enemyTerritory ? 1 : 0);
+}
+
 function getAbilityRangeValue(ability) {
   if (!ability) return null;
   if (Number.isFinite(ability.range)) return ability.range;
@@ -73,27 +114,34 @@ function resetHighlights() {
 }
 
 function renderBoard(board) {
-  const cols = board[0]?.length || 0;
+  const { rows, cols } = boardSize();
+  boardEl.classList.toggle('board--flipped', Boolean(perspective().flipped));
   boardEl.style.setProperty('--board-cols', cols || 1);
   boardEl.innerHTML = '';
-  board.forEach((row, r) => {
-    row.forEach((cell, c) => {
+
+  for (let viewRow = 0; viewRow < rows; viewRow += 1) {
+    for (let viewCol = 0; viewCol < cols; viewCol += 1) {
+      const { row, col } = boardCoordsFromView(viewRow, viewCol);
+      const cell = board?.[row]?.[col];
       const cellEl = document.createElement('button');
       cellEl.type = 'button';
       cellEl.className = 'board-cell';
-      cellEl.dataset.row = r;
-      cellEl.dataset.col = c;
+      cellEl.dataset.row = viewRow;
+      cellEl.dataset.col = viewCol;
 
-      const key = coordKey(r, c);
+      const key = coordKey(row, col);
       if (highlights.moves.has(key)) cellEl.classList.add('highlight-move');
       if (highlights.range.has(key)) cellEl.classList.add('highlight-range');
       if (highlights.targets.has(key)) cellEl.classList.add('highlight-target');
-      if (selectedUnit && selectedUnit.row === r && selectedUnit.col === c) {
+      if (selectedUnit && selectedUnit.row === row && selectedUnit.col === col) {
         cellEl.classList.add('selected');
       }
 
+      cellEl.classList.add(isHomeRow(row) ? 'home-territory' : 'enemy-territory');
+
       if (cell) {
         cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
+        if (cell.enemyTerritory) cellEl.classList.add('crossing-debuff');
         const ability = getPrimaryAbility(cell);
         const cardEl = document.createElement('div');
         cardEl.className = 'unit-card';
@@ -166,12 +214,12 @@ function renderBoard(board) {
 
         cellEl.title = `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
       } else {
-        cellEl.title = `(${r},${c}) empty`;
+        cellEl.title = `${formattedCoords({ row, col })} empty`;
       }
 
-    boardEl.appendChild(cellEl);
-    });
-  });
+      boardEl.appendChild(cellEl);
+    }
+  }
 }
 
 function renderHand(hand) {
@@ -188,7 +236,7 @@ function renderHand(hand) {
       selectedUnit = null;
       currentMode = 'place';
       resetHighlights();
-      metaEl.textContent = `Selected ${entry.slug}. Click a tile to deploy.`;
+      metaEl.textContent = `Selected ${entry.slug}. Click a tile on your side to deploy.`;
       overlay.classList.add('hidden');
       renderBoard(activeMatch.board);
       renderHand(hand);
@@ -351,9 +399,10 @@ function renderLog(lines) {
 function describePiece(piece) {
   if (!piece) return '';
   const sickness = piece.summoningSickness ? ' · Summoning Sickness' : '';
+  const territory = piece.enemyTerritory ? ' · Enemy Territory (+1 STA actions)' : '';
   const primary = getPrimaryAbility(piece);
   const rangeText = primary.range ? ` · RNG ${primary.range}` : '';
-  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}`;
+  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}${territory}`;
 }
 
 function buildAbilityMeta(ability) {
@@ -381,11 +430,12 @@ function renderAbilityActions(piece) {
   }
 
   abilities.forEach((ability) => {
+    const adjustedCost = abilityCost(piece, ability);
     const abilityBtn = document.createElement('button');
     abilityBtn.type = 'button';
     abilityBtn.className = 'ability-action';
     abilityBtn.dataset.ability = ability.slug;
-    abilityBtn.disabled = piece.summoningSickness || piece.stamina < ability.staminaCost || notYourTurn;
+    abilityBtn.disabled = piece.summoningSickness || piece.stamina < adjustedCost || notYourTurn;
     abilityBtn.classList.toggle('active', currentAbilitySlug === ability.slug && currentMode === 'ability');
 
     const header = document.createElement('div');
@@ -395,7 +445,9 @@ function renderAbilityActions(piece) {
     title.textContent = ability.name || ability.slug || 'Ability';
     const cost = document.createElement('span');
     cost.className = 'ability-action__cost';
-    cost.textContent = Number.isFinite(ability.staminaCost) ? `${ability.staminaCost} STA` : '—';
+    cost.textContent = Number.isFinite(adjustedCost)
+      ? `${adjustedCost} STA${piece.enemyTerritory ? ' (enemy side +1)' : ''}`
+      : '—';
     header.append(title, cost);
 
     const meta = document.createElement('div');
@@ -441,12 +493,12 @@ function updateOverlay() {
     resetHighlights();
     return;
   }
-  overlayName.textContent = `${piece.name} (${selectedUnit.row},${selectedUnit.col})`;
+  overlayName.textContent = `${piece.name} ${formattedCoords(selectedUnit)}`;
   overlayStats.textContent = describePiece(piece);
   overlay.classList.remove('hidden');
 
   const notYourTurn = activeMatch.turn !== currentSide;
-  moveBtn.disabled = piece.summoningSickness || piece.stamina <= 0 || notYourTurn;
+  moveBtn.disabled = piece.summoningSickness || piece.stamina < moveCost(piece) || notYourTurn;
   renderAbilityActions(piece);
 }
 
@@ -623,13 +675,16 @@ async function attackTarget(targetRow, targetCol, abilitySlug = '') {
 boardEl.addEventListener('click', (event) => {
   const cellEl = event.target.closest('.board-cell');
   if (!cellEl || !activeMatch || activeMatch.status !== 'active') return;
-  const row = Number(cellEl.dataset.row);
-  const col = Number(cellEl.dataset.col);
+  const viewRow = Number(cellEl.dataset.row);
+  const viewCol = Number(cellEl.dataset.col);
+  const { row, col } = boardCoordsFromView(viewRow, viewCol);
   const key = coordKey(row, col);
   const cell = activeMatch.board[row][col];
 
   if (currentMode === 'place' && selectedHandSlug) {
-    if (!cell) placeCard(row, col);
+    if (!isHomeRow(row)) {
+      metaEl.textContent = 'You can only deploy units on your side of the battlefield.';
+    } else if (!cell) placeCard(row, col);
     else metaEl.textContent = 'Tile occupied. Choose another spot to deploy.';
     return;
   }

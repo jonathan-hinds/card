@@ -196,13 +196,166 @@ function renderHand(hand) {
   });
 }
 
+function parseLogLine(line) {
+  if (typeof line !== 'string') return { type: 'info', title: 'Update', detail: String(line || '') };
+
+  const attackMatch = line.match(
+    /^(.+)'s (.+) used (.+?)(?: for (\d+) damage)?(?: and applied (.+))? on (.+)'s (.+)\.$/
+  );
+  if (attackMatch) {
+    const [, actorPlayer, actorUnit, ability, damage, effects, targetPlayer, targetUnit] = attackMatch;
+    const effectText = effects ? `Effects: ${effects}` : '';
+    const damageText = damage ? `${damage} damage` : 'No damage';
+    return {
+      type: 'attack',
+      title: 'Attack',
+      action: ability,
+      actor: { player: actorPlayer, unit: actorUnit },
+      target: { player: targetPlayer, unit: targetUnit },
+      detail: [damageText, effectText].filter(Boolean).join(' · '),
+    };
+  }
+
+  const moveMatch = line.match(/^(.+) moved (.+) to \((\d+),(\d+)\)\.$/);
+  if (moveMatch) {
+    const [, actorPlayer, unit, row, col] = moveMatch;
+    return {
+      type: 'move',
+      title: 'Movement',
+      action: 'Advance',
+      actor: { player: actorPlayer, unit },
+      detail: `New position: (${row},${col})`,
+    };
+  }
+
+  const deployMatch = line.match(/^(.+) deployed (.+) to \((\d+),(\d+)\)\.$/);
+  if (deployMatch) {
+    const [, actorPlayer, unit, row, col] = deployMatch;
+    return {
+      type: 'deploy',
+      title: 'Deployment',
+      action: 'Placed',
+      actor: { player: actorPlayer, unit },
+      detail: `Position: (${row},${col})`,
+    };
+  }
+
+  const advanceMatch = line.match(/^(.+) advanced (.+) to \((\d+),(\d+)\)\.$/);
+  if (advanceMatch) {
+    const [, actorPlayer, unit, row, col] = advanceMatch;
+    return {
+      type: 'advance',
+      title: 'Advance',
+      action: 'NPC Movement',
+      actor: { player: actorPlayer, unit },
+      detail: `Position: (${row},${col})`,
+    };
+  }
+
+  const defeatMatch = line.match(/^(.+)'s (.+) was defeated\.$/);
+  if (defeatMatch) {
+    const [, player, unit] = defeatMatch;
+    return {
+      type: 'defeat',
+      title: 'Defeat',
+      target: { player, unit },
+      detail: `${unit} fell in battle`,
+    };
+  }
+
+  const statusMatch = line.match(/^(.+) ended their turn\.$/);
+  if (statusMatch) {
+    const [, actorPlayer] = statusMatch;
+    return {
+      type: 'turn',
+      title: 'Turn Ended',
+      actor: { player: actorPlayer },
+      detail: `${actorPlayer} passed control`,
+    };
+  }
+
+  const effectMatch = line.match(/^(.+)'s (.+) is affected by (.+)\.$/);
+  if (effectMatch) {
+    const [, targetPlayer, unit, effect] = effectMatch;
+    return {
+      type: 'effect',
+      title: 'Effect Applied',
+      target: { player: targetPlayer, unit },
+      detail: effect,
+    };
+  }
+
+  return { type: 'info', title: 'Update', detail: line };
+}
+
+function buildParticipant(label, participant) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'event-participant';
+
+  const tag = document.createElement('p');
+  tag.className = 'event-participant__label';
+  tag.textContent = label;
+
+  const player = document.createElement('p');
+  player.className = 'event-participant__player';
+  player.textContent = participant.player || '—';
+
+  const unit = document.createElement('p');
+  unit.className = 'event-participant__unit';
+  unit.textContent = participant.unit || '—';
+
+  wrapper.append(tag, player, unit);
+  return wrapper;
+}
+
 function renderLog(lines) {
   logEl.innerHTML = '';
-  (lines || []).slice(-8).forEach((line) => {
-    const p = document.createElement('p');
-    p.textContent = line;
-    logEl.appendChild(p);
-  });
+  (lines || [])
+    .slice(-8)
+    .map((line) => parseLogLine(line))
+    .forEach((event) => {
+      const card = document.createElement('article');
+      card.className = `event-card event-${event.type}`;
+
+      const header = document.createElement('div');
+      header.className = 'event-card__header';
+      const title = document.createElement('span');
+      title.className = 'event-card__label';
+      title.textContent = event.title;
+      header.appendChild(title);
+      if (event.action) {
+        const action = document.createElement('span');
+        action.className = 'event-card__action';
+        action.textContent = event.action;
+        header.appendChild(action);
+      }
+      card.appendChild(header);
+
+      if (event.actor || event.target) {
+        const participants = document.createElement('div');
+        participants.className = 'event-card__participants';
+        const hasArrow = Boolean(event.actor && event.target);
+        participants.classList.toggle('event-card__participants--has-target', hasArrow);
+        if (event.actor) participants.appendChild(buildParticipant('Initiator', event.actor));
+        if (hasArrow) {
+          const arrow = document.createElement('span');
+          arrow.className = 'event-card__arrow';
+          arrow.textContent = '→';
+          participants.appendChild(arrow);
+        }
+        if (event.target) participants.appendChild(buildParticipant('Target', event.target));
+        card.appendChild(participants);
+      }
+
+      if (event.detail) {
+        const detail = document.createElement('p');
+        detail.className = 'event-card__detail';
+        detail.textContent = event.detail;
+        card.appendChild(detail);
+      }
+
+      logEl.appendChild(card);
+    });
 }
 
 function describePiece(piece) {

@@ -541,6 +541,17 @@ h1 {
   background: #0b0b0b;
   padding: 8px;
   border: 2px solid var(--border);
+  position: relative;
+}
+
+.board::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  pointer-events: none;
 }
 
 .board-cell {
@@ -555,6 +566,18 @@ h1 {
   position: relative;
   cursor: pointer;
   padding: 4px;
+}
+
+.board-cell.home-territory {
+  background: #030303;
+}
+
+.board-cell.enemy-territory {
+  background: #0a0a0a;
+}
+
+.board-cell.crossing-debuff .unit-card {
+  box-shadow: 0 0 0 2px rgba(255, 102, 102, 0.6) inset;
 }
 
 .board-cell.owned {

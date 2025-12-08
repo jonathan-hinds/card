@@ -20,6 +20,7 @@ let usersCollection;
 let cardsCollection;
 let abilitiesCollection;
 let effectsCollection;
+let npcMemoryCollection;
 
 const matchmakingQueue = [];
 const matches = new Map();
@@ -64,15 +65,71 @@ async function ensureDatabase() {
   cardsCollection = db.collection('cards');
   abilitiesCollection = db.collection('abilities');
   effectsCollection = db.collection('effects');
+  npcMemoryCollection = db.collection('npc-memory');
   await usersCollection.createIndex({ username: 1 }, { unique: true });
   await cardsCollection.createIndex({ slug: 1 }, { unique: true });
   await abilitiesCollection.createIndex({ slug: 1 }, { unique: true });
   await effectsCollection.createIndex({ slug: 1 }, { unique: true });
+  await npcMemoryCollection.createIndex({ slug: 1 }, { unique: true });
   await seedEffects(effectsCollection);
   await refreshEffectCache();
   await seedAbilities(abilitiesCollection);
   await seedCards(cardsCollection);
   return { usersCollection, cardsCollection, abilitiesCollection, effectsCollection };
+}
+
+async function loadNpcMemory() {
+  const { npcMemoryCollection: collection } = await ensureDatabase();
+  const memory =
+    (await collection.findOne({ slug: 'npc-brain' })) ||
+    (await collection.findOne({ slug: 'npc-brain', legacy: true }));
+  if (memory) return memory;
+
+  const baseline = {
+    slug: 'npc-brain',
+    totalBattles: 0,
+    wins: 0,
+    losses: 0,
+    totalDamageDealt: 0,
+    totalDamageTaken: 0,
+    updatedAt: new Date(),
+  };
+  await collection.insertOne(baseline);
+  return baseline;
+}
+
+async function recordNpcMemory(match) {
+  if (match.mode !== 'npc' || !match.npc || match?.npcStats?.recorded || match.status !== 'complete') return;
+  const npcName = match.npc.name;
+  const { npcMemoryCollection: collection } = await ensureDatabase();
+  const memory = await loadNpcMemory();
+
+  const npcWon = match.defeated !== npcName;
+  const totalBattles = (memory.totalBattles || 0) + 1;
+  const wins = (memory.wins || 0) + (npcWon ? 1 : 0);
+  const losses = (memory.losses || 0) + (npcWon ? 0 : 1);
+  const totalDamageDealt = (memory.totalDamageDealt || 0) + (match.npcStats?.damageDealt || 0);
+  const totalDamageTaken = (memory.totalDamageTaken || 0) + (match.npcStats?.damageTaken || 0);
+
+  await collection.updateOne(
+    { slug: 'npc-brain' },
+    {
+      $set: {
+        slug: 'npc-brain',
+        totalBattles,
+        wins,
+        losses,
+        totalDamageDealt,
+        totalDamageTaken,
+        lastOpponent: match.players.find((p) => p !== npcName),
+        updatedAt: new Date(),
+      },
+    },
+    { upsert: true }
+  );
+
+  match.npcStats = match.npcStats || {};
+  match.npcStats.recorded = true;
 }
 
 async function refreshEffectCache() {
@@ -236,6 +293,21 @@ function createEmptyBoard() {
     board.push(row);
   }
   return board;
+}
+
+function createRandomHand(cards, limit) {
+  const hand = [];
+  if (!cards.length || limit <= 0) return hand;
+  for (let i = 0; i < limit; i += 1) {
+    const pick = cards[Math.floor(Math.random() * cards.length)];
+    const existing = hand.find((entry) => entry.slug === pick.slug);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      hand.push({ slug: pick.slug, count: 1 });
+    }
+  }
+  return hand;
 }
 
 function canMovePiece(piece, from, to) {
@@ -970,6 +1042,62 @@ app.post('/api/practice/start', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/npc/start', requireAuth, async (req, res) => {
+  try {
+    const existing = findMatchForPlayer(req.player);
+    if (existing && existing.mode === 'npc') {
+      return res.json({ message: 'NPC battle already active.', match: summarizeMatch(existing, req.player) });
+    }
+    if (existing && existing.mode !== 'npc') {
+      return res.status(400).json({ message: 'Finish your current match before starting an NPC battle.' });
+    }
+
+    const queueIndex = matchmakingQueue.findIndex((entry) => entry === req.player);
+    if (queueIndex !== -1) matchmakingQueue.splice(queueIndex, 1);
+
+    const player = await loadPlayer(req.player);
+    if (!player) return res.status(404).json({ message: 'Player not found.' });
+    const totalCards = (player.hand || []).reduce((sum, entry) => sum + entry.count, 0);
+    if (totalCards === 0) {
+      return res.status(400).json({ message: 'Add cards to your hand before starting an NPC battle.' });
+    }
+
+    const { cardsCollection } = await ensureDatabase();
+    const availableCards = await cardsCollection.find({}).toArray();
+    const npcHand = createRandomHand(availableCards, gameConfig.handSize);
+    if (!npcHand.length) {
+      return res.status(400).json({ message: 'No cards available to build an NPC deck.' });
+    }
+
+    const matchId = crypto.randomUUID();
+    const npcName = 'warden-npc';
+    const hands = { [req.player]: JSON.parse(JSON.stringify(player.hand)), [npcName]: npcHand };
+
+    const match = {
+      id: matchId,
+      players: [req.player, npcName],
+      controllers: { [req.player]: req.player, [npcName]: npcName },
+      mode: 'npc',
+      npc: { name: npcName },
+      hands,
+      board: createEmptyBoard(),
+      turn: req.player,
+      turnPlays: 0,
+      status: 'active',
+      log: [`NPC battle ${matchId} created for ${req.player}.`],
+      defeated: null,
+      npcStats: { damageDealt: 0, damageTaken: 0, recorded: false },
+    };
+    match.boardPieces = { [req.player]: 0, [npcName]: 0 };
+
+    matches.set(matchId, match);
+    res.status(201).json({ message: 'NPC battle ready. Open the battlefield to face the Warden.', match: summarizeMatch(match, req.player) });
+  } catch (error) {
+    console.error('NPC start error:', error.message);
+    res.status(500).json({ message: 'Failed to start NPC battle.' });
+  }
+});
+
 function findMatchForPlayer(player) {
   for (const match of matches.values()) {
     if (match.players.includes(player)) return match;
@@ -1014,6 +1142,201 @@ function ensureActive(match) {
     const err = new Error('Match is finished.');
     err.status = 400;
     throw err;
+  }
+}
+
+function opponentOf(match, player) {
+  return match.players.find((p) => p !== player) || player;
+}
+
+function endTurn(match, actingPlayer) {
+  match.board.forEach((row) => {
+    row.forEach((cell) => {
+      if (cell && cell.owner === actingPlayer) {
+        cell.stamina = cell.staminaMax;
+        cell.summoningSickness = false;
+      }
+    });
+  });
+
+  clearExpiredEffects(match, actingPlayer);
+
+  match.turn = opponentOf(match, actingPlayer);
+  match.turnPlays = 0;
+  match.log.push(`${actingPlayer} ended their turn.`);
+}
+
+function listPieces(match, owner) {
+  const pieces = [];
+  match.board.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (cell?.owner === owner) {
+        pieces.push({ row: r, col: c, unit: cell });
+      }
+    });
+  });
+  return pieces;
+}
+
+function manhattanDistance(a, b) {
+  return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
+}
+
+function findNearestEnemy(match, owner, from) {
+  const opponents = listPieces(match, opponentOf(match, owner));
+  let best = null;
+  opponents.forEach((pos) => {
+    const distance = manhattanDistance(from, pos);
+    if (!best || distance < best.distance) {
+      best = { ...pos, distance };
+    }
+  });
+  return best;
+}
+
+function findEmptyCells(match) {
+  const cells = [];
+  match.board.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (!cell) cells.push({ row: r, col: c });
+    });
+  });
+  return cells;
+}
+
+function choosePlacementCell(match, target, aggression = 1) {
+  const empties = findEmptyCells(match);
+  if (!empties.length) return null;
+  if (!target) return empties[Math.floor(Math.random() * empties.length)];
+
+  const sorted = empties
+    .map((cell) => ({ ...cell, distance: manhattanDistance(cell, target) }))
+    .sort((a, b) => a.distance - b.distance);
+
+  const bucket = Math.max(1, Math.round(sorted.length * Math.min(aggression, 1)));
+  return sorted[Math.floor(Math.random() * bucket)] || sorted[0];
+}
+
+async function npcPlaceCard(match) {
+  const npcName = match.npc?.name;
+  if (!npcName || match.turnPlays >= 1) return false;
+  const hand = match.hands[npcName] || [];
+  const available = hand.find((entry) => entry.count > 0);
+  if (!available) return false;
+
+  const card = await getCardBySlug(available.slug);
+  if (!card) return false;
+
+  const targetEnemy = findNearestEnemy(match, npcName, { row: 0, col: 0 });
+  const memory = await loadNpcMemory();
+  const aggression = 1 + (memory.totalDamageDealt - memory.totalDamageTaken) / Math.max(1, memory.totalBattles || 1);
+  const cell = choosePlacementCell(match, targetEnemy, aggression);
+  if (!cell) return false;
+
+  const unit = await buildUnit(card, npcName);
+  drawCardFromHand(hand, available.slug);
+  match.board[cell.row][cell.col] = unit;
+  match.turnPlays += 1;
+  match.boardPieces[npcName] += 1;
+  match.log.push(`${npcName} deployed ${card.name} to (${cell.row},${cell.col}).`);
+  return true;
+}
+
+function npcMoveToward(match, npcName, position) {
+  const { row, col, unit } = position;
+  if (unit.summoningSickness || unit.stamina <= 0 || unit.speed <= 0) return false;
+
+  const target = findNearestEnemy(match, npcName, position);
+  if (!target) return false;
+
+  const rowStep = Math.sign(target.row - row);
+  const colStep = Math.sign(target.col - col);
+  const nextRow = row + Math.max(-unit.speed, Math.min(unit.speed, rowStep));
+  const nextCol = col + Math.max(-unit.speed, Math.min(unit.speed, colStep));
+
+  if (nextRow === row && nextCol === col) return false;
+  if (nextRow < 0 || nextRow >= match.board.length) return false;
+  if (nextCol < 0 || nextCol >= match.board[0].length) return false;
+  if (match.board[nextRow][nextCol]) return false;
+
+  match.board[nextRow][nextCol] = unit;
+  match.board[row][col] = null;
+  unit.stamina -= 1;
+  match.log.push(`${npcName} advanced ${unit.name} to (${nextRow},${nextCol}).`);
+  return true;
+}
+
+function npcAbilityTarget(match, npcName, position, ability) {
+  const range = ability.range ?? ability.attackRange ?? 1;
+  const enemies = listPieces(match, opponentOf(match, npcName));
+  return enemies.find((enemy) => {
+    const rowDiff = Math.abs(enemy.row - position.row);
+    const colDiff = Math.abs(enemy.col - position.col);
+    return Math.max(rowDiff, colDiff) <= range;
+  });
+}
+
+async function npcAttack(match, npcName, position) {
+  const attacker = position.unit;
+  if (attacker.summoningSickness) return false;
+
+  const abilitySlug = attacker.abilities?.[0];
+  const ability = attacker.abilityDetails?.find((a) => a.slug === abilitySlug) || attacker.abilityDetails?.[0];
+  if (!ability) return false;
+  if (attacker.stamina < (ability.staminaCost ?? 1)) return false;
+
+  const target = npcAbilityTarget(match, npcName, position, ability);
+  if (!target) return false;
+
+  const damage = calculateDamageRoll(ability, attacker);
+  if (damage > 0) {
+    target.unit.health -= damage;
+    if (match.mode === 'npc') match.npcStats.damageDealt += damage;
+  }
+  attacker.stamina -= ability.staminaCost ?? 1;
+  applyAbilityEffects(ability, target.unit, match, match.log);
+
+  const effectSummary = (ability.effects || [])
+    .map((slug) => effectMap.get(slug)?.name)
+    .filter(Boolean)
+    .join(', ');
+
+  const damageFragment = damage > 0 ? ` for ${damage} damage` : '';
+  const effectFragment = effectSummary ? ` and applied ${effectSummary}` : '';
+  match.log.push(`${npcName}'s ${attacker.name} used ${ability.name}${damageFragment}${effectFragment}.`);
+
+  if (target.unit.health <= 0) {
+    match.board[target.row][target.col] = null;
+    match.boardPieces[target.unit.owner] -= 1;
+    match.log.push(`${target.unit.owner}'s ${target.unit.name} was defeated.`);
+    defeatIfEmpty(match, target.unit.owner);
+  }
+
+  return true;
+}
+
+async function runNpcTurn(match) {
+  const npcName = match.npc?.name;
+  if (!npcName || match.turn !== npcName || match.status !== 'active') return;
+
+  await npcPlaceCard(match);
+
+  const pieces = listPieces(match, npcName);
+  for (const position of pieces) {
+    if (match.status !== 'active') break;
+    const didAttack = await npcAttack(match, npcName, position);
+    if (!didAttack) {
+      npcMoveToward(match, npcName, position);
+    }
+  }
+
+  if (match.status === 'active') {
+    endTurn(match, npcName);
+    match.log.push(`${npcName} finished its strategy cycle.`);
+  }
+
+  if (match.mode === 'npc' && match.status === 'complete') {
+    await recordNpcMemory(match);
   }
 }
 
@@ -1260,6 +1583,15 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
     const roll = calculateDamageRoll(ability, attacker);
     if (roll > 0) {
       target.health -= roll;
+      if (match.mode === 'npc' && match.npc) {
+        match.npcStats = match.npcStats || { damageDealt: 0, damageTaken: 0, recorded: false };
+        if (attacker.owner === match.npc.name) {
+          match.npcStats.damageDealt += roll;
+        }
+        if (target.owner === match.npc.name) {
+          match.npcStats.damageTaken += roll;
+        }
+      }
     }
     attacker.stamina -= ability.staminaCost;
     applyAbilityEffects(ability, target, match, match.log);
@@ -1280,6 +1612,10 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       defeatIfEmpty(match, target.owner);
     }
 
+    if (match.mode === 'npc' && match.status === 'complete') {
+      await recordNpcMemory(match);
+    }
+
     res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('Attack error:', error.message);
@@ -1287,7 +1623,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/matches/:id/end-turn', requireAuth, (req, res) => {
+app.post('/api/matches/:id/end-turn', requireAuth, async (req, res) => {
   try {
     const match = matches.get(req.params.id);
     if (!match) return res.status(404).json({ message: 'Match not found.' });
@@ -1296,21 +1632,15 @@ app.post('/api/matches/:id/end-turn', requireAuth, (req, res) => {
     ensureActive(match);
     ensureTurn(match, actingPlayer);
 
-    // Reset the current player's pieces for the next turn
-    match.board.forEach((row) => {
-      row.forEach((cell) => {
-        if (cell && cell.owner === actingPlayer) {
-          cell.stamina = cell.staminaMax;
-          cell.summoningSickness = false;
-        }
-      });
-    });
+    endTurn(match, actingPlayer);
 
-    clearExpiredEffects(match, actingPlayer);
+    if (match.mode === 'npc' && match.turn === match.npc?.name) {
+      await runNpcTurn(match);
+    }
 
-    match.turn = match.players.find((p) => p !== actingPlayer) || actingPlayer;
-    match.turnPlays = 0;
-    match.log.push(`${actingPlayer} ended their turn.`);
+    if (match.mode === 'npc' && match.status === 'complete') {
+      await recordNpcMemory(match);
+    }
 
     res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {

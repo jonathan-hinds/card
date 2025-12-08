@@ -4,6 +4,7 @@ const joinQueueBtn = document.getElementById('join-queue');
 const leaveQueueBtn = document.getElementById('leave-queue');
 const openBattleBtn = document.getElementById('open-battlefield');
 const practiceBtn = document.getElementById('start-practice');
+const npcBtn = document.getElementById('start-npc');
 const queueStatus = document.getElementById('queue-status');
 const nameEl = document.getElementById('profile-name');
 const metaEl = document.getElementById('profile-meta');
@@ -17,7 +18,9 @@ async function checkStatus() {
     queueStatus.textContent =
       data.match.mode === 'practice'
         ? 'Practice match ready. Open the battlefield to spar against yourself.'
-        : 'Match found. Open the battlefield to play.';
+        : data.match.mode === 'npc'
+          ? 'NPC battle ready. Open the battlefield to face the Warden.'
+          : 'Match found. Open the battlefield to play.';
   } else if (data.inQueue) {
     queueStatus.textContent = 'Waiting in queue…';
   } else {
@@ -40,6 +43,13 @@ leaveQueueBtn.addEventListener('click', async () => {
 
 practiceBtn.addEventListener('click', async () => {
   const res = await fetch('/api/practice/start', { method: 'POST', headers: { ...authHeaders() } });
+  const data = await res.json();
+  if (res.ok && data.match) setActiveMatch(data.match.id);
+  queueStatus.textContent = data.message;
+});
+
+npcBtn.addEventListener('click', async () => {
+  const res = await fetch('/api/npc/start', { method: 'POST', headers: { ...authHeaders() } });
   const data = await res.json();
   if (res.ok && data.match) setActiveMatch(data.match.id);
   queueStatus.textContent = data.message;

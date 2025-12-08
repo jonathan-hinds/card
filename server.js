@@ -1456,7 +1456,17 @@ app.get('/api/matches/:id', requireAuth, (req, res) => {
   if (!match) return res.status(404).json({ message: 'Match not found.' });
   const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
   if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
-  res.json({ match: summarizeMatch(match, actingPlayer) });
+
+  const isNpcTurn =
+    match.mode === 'npc' && match.status === 'active' && match.turn === match.npc?.name;
+  const maybeRunNpc = isNpcTurn ? runNpcTurn(match) : Promise.resolve();
+
+  maybeRunNpc
+    .then(() => res.json({ match: summarizeMatch(match, actingPlayer) }))
+    .catch((error) => {
+      console.error('Match fetch error:', error.message);
+      res.status(500).json({ message: 'Failed to load match.' });
+    });
 });
 
 app.post('/api/matches/:id/place', requireAuth, async (req, res) => {

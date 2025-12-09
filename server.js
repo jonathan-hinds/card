@@ -1395,7 +1395,7 @@ async function npcAttack(match, npcName, position) {
     if (match.mode === 'npc') match.npcStats.damageDealt += damage;
   }
   attacker.stamina -= staminaCost;
-  applyAbilityEffects(ability, target.unit, match, match.log);
+  applyAbilityEffects(ability, target.unit, match, match.log, attacker);
 
   const effectSummary = (ability.effects || [])
     .map((slug) => effectMap.get(slug)?.name)
@@ -1421,25 +1421,31 @@ async function npcAttack(match, npcName, position) {
 async function runNpcTurn(match) {
   const npcName = match.npc?.name;
   if (!npcName || match.turn !== npcName || match.status !== 'active') return;
+  if (match.processingNpcTurn) return;
 
-  await npcPlaceCard(match);
+  match.processingNpcTurn = true;
+  try {
+    await npcPlaceCard(match);
 
-  const pieces = listPieces(match, npcName);
-  for (const position of pieces) {
-    if (match.status !== 'active') break;
-    const didAttack = await npcAttack(match, npcName, position);
-    if (!didAttack) {
-      npcMoveToward(match, npcName, position);
+    const pieces = listPieces(match, npcName);
+    for (const position of pieces) {
+      if (match.status !== 'active') break;
+      const didAttack = await npcAttack(match, npcName, position);
+      if (!didAttack) {
+        npcMoveToward(match, npcName, position);
+      }
     }
-  }
 
-  if (match.status === 'active') {
-    endTurn(match, npcName);
-    match.log.push(`${npcName} finished its strategy cycle.`);
-  }
+    if (match.status === 'active') {
+      endTurn(match, npcName);
+      match.log.push(`${npcName} finished its strategy cycle.`);
+    }
 
-  if (match.mode === 'npc' && match.status === 'complete') {
-    await recordNpcMemory(match);
+    if (match.mode === 'npc' && match.status === 'complete') {
+      await recordNpcMemory(match);
+    }
+  } finally {
+    match.processingNpcTurn = false;
   }
 }
 
@@ -1459,7 +1465,7 @@ function calculateDamageRoll(ability, attacker) {
   return roll;
 }
 
-function applyAbilityEffects(ability, target, match, log) {
+function applyAbilityEffects(ability, target, match, log, source) {
   if (!ability.effects || !ability.effects.length) return;
   target.activeEffects = target.activeEffects || [];
 
@@ -1473,7 +1479,9 @@ function applyAbilityEffects(ability, target, match, log) {
       target.stamina = Math.max(0, Math.min(target.staminaMax, target.stamina + active.modifiers.staminaChange));
     }
 
-    log.push(`${target.owner}'s ${target.name} is affected by ${effect.name}.`);
+    const sourceOwner = source?.owner ? `${source.owner}'s ${source.name}` : 'An ability';
+    const targetLabel = `${target.owner}'s ${target.name}`;
+    log.push(`${sourceOwner} applied ${effect.name} to ${targetLabel}.`);
   });
 }
 
@@ -1713,7 +1721,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
       }
     }
     attacker.stamina -= staminaCost;
-    applyAbilityEffects(ability, target, match, match.log);
+    applyAbilityEffects(ability, target, match, match.log, attacker);
 
     const effectSummary = (ability.effects || [])
       .map((slug) => effectMap.get(slug)?.name)
@@ -1753,6 +1761,13 @@ app.post('/api/matches/:id/end-turn', requireAuth, async (req, res) => {
     ensureActive(match);
 
     if (match.mode === 'npc' && match.turn === match.npc?.name && actingPlayer !== match.turn) {
+      if (match.processingNpcTurn) {
+        return res.status(202).json({
+          match: summarizeMatch(match, actingPlayer),
+          message: 'NPC turn is already in progress.',
+        });
+      }
+
       await runNpcTurn(match);
 
       if (match.mode === 'npc' && match.status === 'complete') {

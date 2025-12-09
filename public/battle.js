@@ -15,12 +15,16 @@ const nameEl = document.getElementById('profile-name');
 const metaEl = document.getElementById('profile-meta');
 const logoutBtn = document.getElementById('logout');
 const handEl = document.getElementById('hand');
+const actionModal = document.getElementById('action-modal');
 const overlay = document.getElementById('action-overlay');
 const overlayName = document.getElementById('selected-name');
 const overlayStats = document.getElementById('selected-stats');
 const moveBtn = document.getElementById('overlay-move');
-const cancelBtn = document.getElementById('cancel-action');
 const overlayAbilities = document.getElementById('overlay-abilities');
+const actionToolbar = document.getElementById('action-toolbar');
+const actionContext = document.getElementById('action-context');
+const cancelBtn = document.getElementById('cancel-action');
+const closeActionModalBtn = document.getElementById('close-action-modal');
 const sideSelector = document.getElementById('side-selector');
 
 let activeMatch = null;
@@ -111,6 +115,37 @@ function resetHighlights() {
   highlights.moves.clear();
   highlights.range.clear();
   highlights.targets.clear();
+}
+
+function showActionModal() {
+  if (actionModal) actionModal.classList.remove('hidden');
+}
+
+function hideActionModal() {
+  if (actionModal) actionModal.classList.add('hidden');
+}
+
+function updateActionToolbar(message = '') {
+  const activeMode = currentMode === 'move' || currentMode === 'ability';
+  if (!actionToolbar) return;
+  if (message && actionContext) {
+    actionContext.textContent = message;
+  } else if (activeMode && actionContext && !actionContext.textContent) {
+    actionContext.textContent = metaEl.textContent;
+  }
+  actionToolbar.classList.toggle('hidden', !activeMode);
+}
+
+function clearSelection(message = 'Action cancelled.') {
+  selectedHandSlug = '';
+  selectedUnit = null;
+  currentMode = null;
+  currentAbilitySlug = '';
+  resetHighlights();
+  hideActionModal();
+  updateActionToolbar();
+  if (activeMatch?.board) renderBoard(activeMatch.board);
+  if (message) metaEl.textContent = message;
 }
 
 function renderBoard(board) {
@@ -237,7 +272,7 @@ function renderHand(hand) {
       currentMode = 'place';
       resetHighlights();
       metaEl.textContent = `Selected ${entry.slug}. Click a tile on your side to deploy.`;
-      overlay.classList.add('hidden');
+      hideActionModal();
       renderBoard(activeMatch.board);
       renderHand(hand);
     });
@@ -474,28 +509,34 @@ function startAbilityTargeting(piece, ability) {
   currentAbilitySlug = ability.slug;
   renderBoard(activeMatch.board);
   renderAbilityActions(piece);
-  metaEl.textContent = targets.length
+  const message = targets.length
     ? `Select a target for ${ability.name}.`
     : `No valid targets in range for ${ability.name}.`;
+  metaEl.textContent = message;
+  hideActionModal();
+  updateActionToolbar(message);
 }
 
 function updateOverlay() {
   if (!selectedUnit || !activeMatch) {
-    overlay.classList.add('hidden');
+    hideActionModal();
+    updateActionToolbar();
     return;
   }
   const piece = activeMatch.board?.[selectedUnit.row]?.[selectedUnit.col];
   if (!piece || piece.owner !== currentSide) {
-    overlay.classList.add('hidden');
-    selectedUnit = null;
-    currentMode = null;
-    currentAbilitySlug = '';
-    resetHighlights();
+    hideActionModal();
+    clearSelection('Selection cleared.');
     return;
   }
   overlayName.textContent = `${piece.name} ${formattedCoords(selectedUnit)}`;
   overlayStats.textContent = describePiece(piece);
-  overlay.classList.remove('hidden');
+  if (currentMode === 'move' || currentMode === 'ability') {
+    hideActionModal();
+  } else {
+    showActionModal();
+  }
+  updateActionToolbar();
 
   const notYourTurn = activeMatch.turn !== currentSide;
   moveBtn.disabled = piece.summoningSickness || piece.stamina < moveCost(piece) || notYourTurn;
@@ -713,19 +754,25 @@ moveBtn.addEventListener('click', () => {
   currentMode = 'move';
   currentAbilitySlug = '';
   renderBoard(activeMatch.board);
-  metaEl.textContent = spaces.length ? 'Choose a highlighted tile to move.' : 'No reachable tiles.';
+  const message = spaces.length ? 'Choose a highlighted tile to move.' : 'No reachable tiles.';
+  metaEl.textContent = message;
+  hideActionModal();
+  updateActionToolbar(message);
 });
 
-cancelBtn.addEventListener('click', () => {
-  selectedHandSlug = '';
-  selectedUnit = null;
-  currentMode = null;
-  currentAbilitySlug = '';
-  resetHighlights();
-  overlay.classList.add('hidden');
-  renderBoard(activeMatch.board);
-  metaEl.textContent = 'Action cancelled.';
-});
+cancelBtn.addEventListener('click', () => clearSelection());
+
+if (closeActionModalBtn) {
+  closeActionModalBtn.addEventListener('click', () => clearSelection('Selection closed.'));
+}
+
+if (actionModal) {
+  actionModal.addEventListener('click', (event) => {
+    if (event.target?.dataset?.dismissAction !== undefined) {
+      clearSelection('Selection closed.');
+    }
+  });
+}
 
 sideSelector.addEventListener('change', () => {
   currentSide = sideSelector.value;

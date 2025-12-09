@@ -38,17 +38,11 @@
         </div>
         <div class="board-wrap">
           <div class="board" id="board"></div>
-          <div class="action-overlay hidden" id="action-overlay">
-            <div>
-              <p class="label">Selected unit</p>
-              <p class="value" id="selected-name">—</p>
-              <p class="muted" id="selected-stats">Click one of your units to move or use an ability.</p>
-            </div>
-            <div class="overlay-actions">
-              <button class="ghost" type="button" id="cancel-action">Cancel</button>
-              <button class="cta" type="button" id="overlay-move">Move</button>
-            </div>
-            <div class="overlay-abilities" id="overlay-abilities"></div>
+        </div>
+        <div class="action-toolbar hidden" id="action-toolbar">
+          <p class="action-toolbar__message" id="action-context"></p>
+          <div class="action-toolbar__actions">
+            <button class="ghost" type="button" id="cancel-action">Cancel action</button>
           </div>
         </div>
         <div class="turn-panel">
@@ -77,6 +71,22 @@
     </main>
 
     <footer class="foot">Attacks cost stamina · One card per turn</footer>
+
+    <div class="action-modal hidden" id="action-modal">
+      <div class="action-modal__backdrop" data-dismiss-action></div>
+      <div class="action-overlay" id="action-overlay">
+        <button class="icon-button" type="button" id="close-action-modal" aria-label="Close actions">✕</button>
+        <div>
+          <p class="label">Selected unit</p>
+          <p class="value" id="selected-name">—</p>
+          <p class="muted" id="selected-stats">Click one of your units to move or use an ability.</p>
+        </div>
+        <div class="overlay-actions">
+          <button class="cta" type="button" id="overlay-move">Move</button>
+        </div>
+        <div class="overlay-abilities" id="overlay-abilities"></div>
+      </div>
+    </div>
 
     <script type="module" src="/battle.js"></script>
   </body>

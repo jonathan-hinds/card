@@ -703,16 +703,31 @@ h1 {
   border-color: #fff;
 }
 
-.action-overlay {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  border: 2px solid var(--border);
-  background: rgba(0, 0, 0, 0.92);
-  padding: 12px;
+.action-modal {
+  position: fixed;
+  inset: 0;
   display: grid;
-  gap: 8px;
-  max-width: 320px;
+  place-items: center;
+  z-index: 10;
+}
+
+.action-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.action-overlay {
+  position: relative;
+  border: 2px solid var(--border);
+  background: rgba(0, 0, 0, 0.96);
+  padding: 14px 14px 16px;
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+  width: min(92vw, 400px);
+  z-index: 1;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
 }
 
 .action-overlay .overlay-actions {
@@ -765,6 +780,38 @@ h1 {
 
 .ability-action__desc {
   margin: 0;
+}
+
+.action-toolbar {
+  border: 2px solid var(--border);
+  background: #050505;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-toolbar__message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.action-toolbar__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .hand-panel {

@@ -389,46 +389,98 @@ function buildParticipant(label, participant) {
   return wrapper;
 }
 
+function getEventOwner(event, fallbackOwner) {
+  if (event?.actor?.player) return event.actor.player;
+  if (event?.target?.player) return event.target.player;
+  return fallbackOwner || 'Unknown';
+}
+
+function groupEventsByTurn(events) {
+  const groups = [];
+  let currentOwner = null;
+  let currentGroup = null;
+
+  events.forEach((event) => {
+    const owner = getEventOwner(event, currentOwner);
+    const groupOwner = owner || 'Unknown';
+
+    if (!currentGroup || groupOwner !== currentOwner) {
+      currentGroup = { owner: groupOwner, events: [] };
+      groups.push(currentGroup);
+      currentOwner = groupOwner;
+    }
+
+    currentGroup.events.push(event);
+
+    if (event.type === 'turn') {
+      currentGroup = null;
+      currentOwner = null;
+    }
+  });
+
+  return groups;
+}
+
+function buildEventCard(event) {
+  const card = document.createElement('article');
+  card.className = `event-row event-${event.type}`;
+
+  const header = document.createElement('div');
+  header.className = 'event-row__header';
+  const title = document.createElement('span');
+  title.className = 'event-row__label';
+  title.textContent = event.title;
+  header.appendChild(title);
+  if (event.action) {
+    const action = document.createElement('span');
+    action.className = 'event-row__action';
+    action.textContent = event.action;
+    header.appendChild(action);
+  }
+  card.appendChild(header);
+
+  if (event.actor || event.target) {
+    const participants = document.createElement('div');
+    participants.className = 'event-row__participants';
+    if (event.actor) participants.appendChild(buildParticipant('Actor', event.actor));
+    if (event.target) participants.appendChild(buildParticipant('Target', event.target));
+    card.appendChild(participants);
+  }
+
+  if (event.detail) {
+    const detail = document.createElement('p');
+    detail.className = 'event-row__detail';
+    detail.textContent = event.detail;
+    card.appendChild(detail);
+  }
+
+  return card;
+}
+
 function renderLog(lines) {
   logEl.innerHTML = '';
-  (lines || [])
-    .slice(-12)
-    .map((line) => parseLogLine(line))
-    .forEach((event) => {
-      const card = document.createElement('article');
-      card.className = `event-row event-${event.type}`;
+  const events = (lines || []).slice(-20).map((line) => parseLogLine(line));
+  const groups = groupEventsByTurn(events);
 
-      const header = document.createElement('div');
-      header.className = 'event-row__header';
-      const title = document.createElement('span');
-      title.className = 'event-row__label';
-      title.textContent = event.title;
-      header.appendChild(title);
-      if (event.action) {
-        const action = document.createElement('span');
-        action.className = 'event-row__action';
-        action.textContent = event.action;
-        header.appendChild(action);
-      }
-      card.appendChild(header);
+  groups.forEach((group) => {
+    const groupEl = document.createElement('section');
+    const isSelf = group.owner === currentSide;
+    groupEl.className = `log-group ${isSelf ? 'log-group--self' : 'log-group--opponent'}`;
 
-      if (event.actor || event.target) {
-        const participants = document.createElement('div');
-        participants.className = 'event-row__participants';
-        if (event.actor) participants.appendChild(buildParticipant('Actor', event.actor));
-        if (event.target) participants.appendChild(buildParticipant('Target', event.target));
-        card.appendChild(participants);
-      }
+    const header = document.createElement('div');
+    header.className = 'log-group__header';
+    header.textContent = isSelf ? 'Your turn' : `${group.owner}'s turn`;
+    groupEl.appendChild(header);
 
-      if (event.detail) {
-        const detail = document.createElement('p');
-        detail.className = 'event-row__detail';
-        detail.textContent = event.detail;
-        card.appendChild(detail);
-      }
-
-      logEl.appendChild(card);
+    const eventsEl = document.createElement('div');
+    eventsEl.className = 'log-group__events';
+    group.events.forEach((event) => {
+      eventsEl.appendChild(buildEventCard(event));
     });
+    groupEl.appendChild(eventsEl);
+
+    logEl.appendChild(groupEl);
+  });
 }
 
 function describePiece(piece) {

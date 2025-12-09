@@ -880,8 +880,41 @@ h1 {
   background: #000;
   min-height: 80px;
   font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.log-group {
+  display: grid;
+  gap: 6px;
+  max-width: 90%;
+  align-self: flex-start;
+}
+
+.log-group__header {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.log-group__events {
   display: grid;
   gap: 8px;
+}
+
+.log-group--self {
+  align-self: flex-end;
+}
+
+.log-group--self .log-group__events {
+  text-align: right;
+}
+
+.log-group--self .event-row {
+  background: #0d1b2b;
+  border-color: #0f2d44;
 }
 
 .event-row {

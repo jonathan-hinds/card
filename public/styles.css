@@ -711,6 +711,10 @@ h1 {
   z-index: 10;
 }
 
+.action-modal.hidden {
+  display: none;
+}
+
 .action-modal__backdrop {
   position: absolute;
   inset: 0;

@@ -26,6 +26,7 @@ const actionContext = document.getElementById('action-context');
 const cancelBtn = document.getElementById('cancel-action');
 const closeActionModalBtn = document.getElementById('close-action-modal');
 const sideSelector = document.getElementById('side-selector');
+const staminaBanner = document.getElementById('stamina-banner');
 
 let activeMatch = null;
 let controllerName = '';
@@ -34,6 +35,7 @@ let selectedHandSlug = '';
 let selectedUnit = null;
 let currentMode = null; // place | move | ability | null
 let currentAbilitySlug = '';
+let staminaBannerTimeout = null;
 const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
@@ -77,6 +79,10 @@ function moveCost(piece) {
 function abilityCost(piece, ability) {
   const base = Number.isFinite(ability?.staminaCost) ? ability.staminaCost : 1;
   return base + (piece?.enemyTerritory ? 1 : 0);
+}
+
+function cardHasStamina(piece) {
+  return Number.isFinite(piece?.stamina) ? piece.stamina > 0 : false;
 }
 
 function getAbilityRangeValue(ability) {
@@ -123,6 +129,14 @@ function showActionModal() {
 
 function hideActionModal() {
   if (actionModal) actionModal.classList.add('hidden');
+}
+
+function showStaminaBanner(message = 'Out of stamina.') {
+  if (!staminaBanner) return;
+  staminaBanner.textContent = message;
+  staminaBanner.classList.add('visible');
+  if (staminaBannerTimeout) clearTimeout(staminaBannerTimeout);
+  staminaBannerTimeout = setTimeout(() => staminaBanner.classList.remove('visible'), 1800);
 }
 
 function updateActionToolbar(message = '') {
@@ -581,8 +595,14 @@ function updateOverlay() {
     clearSelection('Selection cleared.');
     return;
   }
+  const hasStamina = cardHasStamina(piece);
   overlayName.textContent = `${piece.name} ${formattedCoords(selectedUnit)}`;
   overlayStats.textContent = describePiece(piece);
+  if (!hasStamina) {
+    hideActionModal();
+    updateActionToolbar();
+    return;
+  }
   if (currentMode === 'move' || currentMode === 'ability') {
     hideActionModal();
   } else {
@@ -703,9 +723,20 @@ function selectUnit(row, col) {
   currentMode = null;
   currentAbilitySlug = '';
   resetHighlights();
+  const piece = activeMatch.board?.[row]?.[col];
+  if (!piece) {
+    updateOverlay();
+    renderBoard(activeMatch.board);
+    metaEl.textContent = 'Selection cleared.';
+    return;
+  }
+  const hasStamina = cardHasStamina(piece);
+  metaEl.textContent = hasStamina
+    ? 'Choose Move or an ability to act with this unit.'
+    : `${piece?.name || 'This unit'} is out of stamina.`;
+  if (!hasStamina) showStaminaBanner(metaEl.textContent);
   updateOverlay();
   renderBoard(activeMatch.board);
-  metaEl.textContent = 'Choose Move or an ability to act with this unit.';
 }
 
 async function placeCard(row, col) {

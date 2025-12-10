@@ -28,6 +28,8 @@ const closeActionModalBtn = document.getElementById('close-action-modal');
 const sideSelector = document.getElementById('side-selector');
 const staminaBanner = document.getElementById('stamina-banner');
 
+const STARTING_HAND_DRAW = 3;
+
 let activeMatch = null;
 let controllerName = '';
 let currentSide = '';
@@ -182,89 +184,92 @@ function renderBoard(board) {
       if (highlights.moves.has(key)) cellEl.classList.add('highlight-move');
       if (highlights.range.has(key)) cellEl.classList.add('highlight-range');
       if (highlights.targets.has(key)) cellEl.classList.add('highlight-target');
-      if (selectedUnit && selectedUnit.row === row && selectedUnit.col === col) {
-        cellEl.classList.add('selected');
+    if (selectedUnit && selectedUnit.row === row && selectedUnit.col === col) {
+      cellEl.classList.add('selected');
+    }
+
+    cellEl.classList.add(isHomeRow(row) ? 'home-territory' : 'enemy-territory');
+
+    if (cell) {
+      const isHidden = Boolean(cell.hidden);
+      cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
+      if (cell.enemyTerritory) cellEl.classList.add('crossing-debuff');
+      const ability = isHidden ? null : getPrimaryAbility(cell);
+      const cardEl = document.createElement('div');
+      cardEl.className = `unit-card ${isHidden ? 'unit-card--hidden' : ''}`;
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'unit-header';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'unit-name';
+      nameEl.textContent = isHidden ? 'Hidden unit' : cell.name;
+      const ownerEl = document.createElement('span');
+      ownerEl.className = 'unit-owner';
+      ownerEl.textContent = cell.owner;
+      headerEl.append(nameEl, ownerEl);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'unit-body';
+      const abilityName = document.createElement('p');
+      abilityName.className = 'ability-name';
+      abilityName.textContent = isHidden ? 'Ability concealed' : ability?.title || 'Ability';
+
+      const abilityMeta = document.createElement('div');
+      abilityMeta.className = 'ability-meta';
+
+      const metaItems = [];
+
+      if (!isHidden && ability?.damage) {
+        const abilityDamage = document.createElement('span');
+        abilityDamage.className = 'ability-pill ability-damage';
+        abilityDamage.textContent = `DMG ${ability.damage}`;
+        metaItems.push(abilityDamage);
       }
 
-      cellEl.classList.add(isHomeRow(row) ? 'home-territory' : 'enemy-territory');
-
-      if (cell) {
-        cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
-        if (cell.enemyTerritory) cellEl.classList.add('crossing-debuff');
-        const ability = getPrimaryAbility(cell);
-        const cardEl = document.createElement('div');
-        cardEl.className = 'unit-card';
-
-        const headerEl = document.createElement('div');
-        headerEl.className = 'unit-header';
-        const nameEl = document.createElement('span');
-        nameEl.className = 'unit-name';
-        nameEl.textContent = cell.name;
-        const ownerEl = document.createElement('span');
-        ownerEl.className = 'unit-owner';
-        ownerEl.textContent = cell.owner;
-        headerEl.append(nameEl, ownerEl);
-
-        const bodyEl = document.createElement('div');
-        bodyEl.className = 'unit-body';
-        const abilityName = document.createElement('p');
-        abilityName.className = 'ability-name';
-        abilityName.textContent = ability.title;
-
-        const abilityMeta = document.createElement('div');
-        abilityMeta.className = 'ability-meta';
-
-        const metaItems = [];
-
-        if (ability.damage) {
-          const abilityDamage = document.createElement('span');
-          abilityDamage.className = 'ability-pill ability-damage';
-          abilityDamage.textContent = `DMG ${ability.damage}`;
-          metaItems.push(abilityDamage);
-        }
-
-        if (ability.range) {
-          const abilityRange = document.createElement('span');
-          abilityRange.className = 'ability-pill ability-range';
-          abilityRange.textContent = `RNG ${ability.range}`;
-          metaItems.push(abilityRange);
-        }
-
-        if (ability.cost) {
-          const abilityCost = document.createElement('span');
-          abilityCost.className = 'ability-pill ability-cost';
-          abilityCost.textContent = `COST ${ability.cost}`;
-          metaItems.push(abilityCost);
-        }
-
-        if (ability.target) {
-          const abilityTarget = document.createElement('span');
-          abilityTarget.className = 'ability-pill ability-target';
-          abilityTarget.textContent = `TARGET ${ability.target}`;
-          metaItems.push(abilityTarget);
-        }
-
-        bodyEl.appendChild(abilityName);
-        if (metaItems.length) {
-          metaItems.forEach((el) => abilityMeta.appendChild(el));
-          bodyEl.appendChild(abilityMeta);
-        }
-
-        const statsEl = document.createElement('div');
-        statsEl.className = 'unit-stats';
-        const hpEl = document.createElement('span');
-        hpEl.textContent = `HP ${cell.health}`;
-        const staminaEl = document.createElement('span');
-        staminaEl.textContent = `STA ${cell.stamina}/${cell.staminaMax}`;
-        statsEl.append(hpEl, staminaEl);
-
-        cardEl.append(headerEl, bodyEl, statsEl);
-        cellEl.append(cardEl);
-
-        cellEl.title = `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
-      } else {
-        cellEl.title = `${formattedCoords({ row, col })} empty`;
+      if (!isHidden && ability?.range) {
+        const abilityRange = document.createElement('span');
+        abilityRange.className = 'ability-pill ability-range';
+        abilityRange.textContent = `RNG ${ability.range}`;
+        metaItems.push(abilityRange);
       }
+
+      if (!isHidden && ability?.cost) {
+        const abilityCost = document.createElement('span');
+        abilityCost.className = 'ability-pill ability-cost';
+        abilityCost.textContent = `COST ${ability.cost}`;
+        metaItems.push(abilityCost);
+      }
+
+      if (!isHidden && ability?.target) {
+        const abilityTarget = document.createElement('span');
+        abilityTarget.className = 'ability-pill ability-target';
+        abilityTarget.textContent = `TARGET ${ability.target}`;
+        metaItems.push(abilityTarget);
+      }
+
+      bodyEl.appendChild(abilityName);
+      if (metaItems.length) {
+        metaItems.forEach((el) => abilityMeta.appendChild(el));
+        bodyEl.appendChild(abilityMeta);
+      }
+
+      const statsEl = document.createElement('div');
+      statsEl.className = 'unit-stats';
+      const hpEl = document.createElement('span');
+      hpEl.textContent = isHidden ? 'HP ???' : `HP ${cell.health}`;
+      const staminaEl = document.createElement('span');
+      staminaEl.textContent = isHidden ? 'STA ???' : `STA ${cell.stamina}/${cell.staminaMax}`;
+      statsEl.append(hpEl, staminaEl);
+
+      cardEl.append(headerEl, bodyEl, statsEl);
+      cellEl.append(cardEl);
+
+      cellEl.title = isHidden
+        ? `${cell.owner} · Hidden unit (${formattedCoords({ row, col })})`
+        : `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
+    } else {
+      cellEl.title = `${formattedCoords({ row, col })} empty`;
+    }
 
       boardEl.appendChild(cellEl);
     }
@@ -498,6 +503,7 @@ function renderLog(lines) {
 }
 
 function describePiece(piece) {
+  if (piece?.hidden) return 'Hidden unit';
   if (!piece) return '';
   const sickness = piece.summoningSickness ? ' · Summoning Sickness' : '';
   const territory = piece.enemyTerritory ? ' · Enemy Territory (+1 STA actions)' : '';
@@ -520,7 +526,7 @@ function renderAbilityActions(piece) {
   if (!overlayAbilities) return;
   overlayAbilities.innerHTML = '';
   const abilities = piece?.abilityDetails || [];
-  const notYourTurn = activeMatch?.turn !== currentSide;
+  const notYourTurn = activeMatch?.turn !== currentSide || activeMatch?.phase === 'deploy';
 
   if (!abilities.length) {
     const empty = document.createElement('p');
@@ -610,7 +616,7 @@ function updateOverlay() {
   }
   updateActionToolbar();
 
-  const notYourTurn = activeMatch.turn !== currentSide;
+  const notYourTurn = activeMatch.turn !== currentSide || activeMatch.phase === 'deploy';
   moveBtn.disabled = piece.summoningSickness || piece.stamina < moveCost(piece) || notYourTurn;
   renderAbilityActions(piece);
 }
@@ -639,14 +645,26 @@ function renderMatch(match) {
   updateSideSelector(match);
   renderBoard(match.board);
   renderLog(match.log);
-  turnIndicator.textContent = match.turn;
+  const isDeploy = match.phase === 'deploy';
+  const placementTarget = match.startingGoals?.[currentSide] || STARTING_HAND_DRAW;
+  const placements = match.deployments?.[currentSide] || 0;
+  const isReady = Boolean(match.ready?.[currentSide]);
+  turnIndicator.textContent = isDeploy ? 'Deploying' : match.turn;
   const isActive = match.status === 'active';
   boardEl.classList.toggle('board--inactive', !isActive);
   handEl.classList.toggle('hand-row--inactive', !isActive);
-  endTurnBtn.disabled = !isActive;
+  endTurnBtn.textContent = isDeploy ? 'Ready Up' : 'End Turn';
+  endTurnBtn.disabled = !isActive || (isDeploy ? isReady || placements < placementTarget : false);
   const hand = match.hands ? match.hands[currentSide] || [] : [];
   renderHand(hand);
   updateOverlay();
+  if (isDeploy) {
+    const remaining = Math.max(0, placementTarget - placements);
+    const deployMessage = isReady
+      ? 'Waiting for all players to ready up. Units will reveal once everyone is set.'
+      : `Place your ${placementTarget} starting units (${placements}/${placementTarget}) before readying up.`;
+    metaEl.textContent = remaining ? deployMessage : deployMessage;
+  }
   if (!isActive) {
     setActiveMatch('');
     metaEl.textContent = match.defeated
@@ -741,6 +759,10 @@ function selectUnit(row, col) {
 
 async function placeCard(row, col) {
   if (!selectedHandSlug) return;
+  if (activeMatch?.phase === 'deploy' && activeMatch?.ready?.[currentSide]) {
+    metaEl.textContent = 'You have already readied up.';
+    return;
+  }
   const payload = { cardSlug: selectedHandSlug, row, col };
   const res = await fetch(`/api/matches/${activeMatch.id}/place`, {
     method: 'POST',
@@ -758,6 +780,10 @@ async function placeCard(row, col) {
 }
 
 async function moveCard(toRow, toCol) {
+  if (activeMatch?.phase === 'deploy') {
+    metaEl.textContent = 'Finish deployment before moving units.';
+    return;
+  }
   if (!selectedUnit) return;
   const payload = { fromRow: selectedUnit.row, fromCol: selectedUnit.col, toRow, toCol };
   const res = await fetch(`/api/matches/${activeMatch.id}/move`, {
@@ -776,6 +802,10 @@ async function moveCard(toRow, toCol) {
 }
 
 async function attackTarget(targetRow, targetCol, abilitySlug = '') {
+  if (activeMatch?.phase === 'deploy') {
+    metaEl.textContent = 'Finish deployment before attacking.';
+    return;
+  }
   if (!selectedUnit) return;
   const origin = { ...selectedUnit };
   const payload = { fromRow: selectedUnit.row, fromCol: selectedUnit.col, targetRow, targetCol };
@@ -869,10 +899,12 @@ sideSelector.addEventListener('change', () => {
 
 endTurnBtn.addEventListener('click', async () => {
   if (!activeMatch || activeMatch.status !== 'active') return;
-  const res = await fetch(`/api/matches/${activeMatch.id}/end-turn`, { method: 'POST', headers: sideAwareHeaders() });
+  const isDeploy = activeMatch.phase === 'deploy';
+  const path = isDeploy ? 'ready' : 'end-turn';
+  const res = await fetch(`/api/matches/${activeMatch.id}/${path}`, { method: 'POST', headers: sideAwareHeaders() });
   const data = await res.json();
-  if (res.ok) renderMatch(data.match);
-  metaEl.textContent = data.message || 'Turn ended';
+  if (res.ok && data.match) renderMatch(data.match);
+  metaEl.textContent = data.message || (isDeploy ? 'Ready check sent.' : 'Turn ended');
 });
 
 leaveMatchBtn.addEventListener('click', async () => {

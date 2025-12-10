@@ -20,6 +20,9 @@ const EFFECT_PRIORITY = new Map([
 ]);
 let effectMap = new Map();
 
+const STARTING_HAND_DRAW = 3;
+
+
 let usersCollection;
 let cardsCollection;
 let abilitiesCollection;
@@ -370,6 +373,56 @@ function createRandomHand(cards, limit) {
   return hand;
 }
 
+function cloneHand(hand = []) {
+  return JSON.parse(JSON.stringify(hand));
+}
+
+function totalCardCount(entries = []) {
+  return entries.reduce((sum, entry) => sum + (entry.count || 0), 0);
+}
+
+function removeEmptyEntries(collection = []) {
+  for (let i = collection.length - 1; i >= 0; i -= 1) {
+    if (!collection[i] || collection[i].count <= 0) collection.splice(i, 1);
+  }
+}
+
+function drawCards(deck = [], count = 1) {
+  const drawn = [];
+  for (let i = 0; i < count; i += 1) {
+    const remaining = totalCardCount(deck);
+    if (remaining <= 0) break;
+
+    const roll = Math.floor(Math.random() * remaining);
+    let cursor = 0;
+    let choice = null;
+    deck.forEach((entry) => {
+      if (choice || !entry?.count) return;
+      cursor += entry.count;
+      if (roll < cursor) choice = entry;
+    });
+
+    if (choice) {
+      choice.count -= 1;
+      drawn.push(choice.slug);
+    }
+  }
+
+  removeEmptyEntries(deck);
+  return drawn;
+}
+
+function addDrawnCardsToHand(hand = [], drawn = []) {
+  drawn.forEach((slug) => {
+    const existing = hand.find((card) => card.slug === slug);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      hand.push({ slug, count: 1 });
+    }
+  });
+}
+
 function canMovePiece(piece, from, to) {
   const rowDiff = Math.abs(from.row - to.row);
   const colDiff = Math.abs(from.col - to.col);
@@ -402,24 +455,39 @@ function drawCardFromHand(hand, slug) {
 
 function remainingPieces(playerState) {
   const boardCount = playerState.boardPieces || 0;
-  const handCount = (playerState.hand || []).reduce((sum, card) => sum + card.count, 0);
-  return boardCount + handCount;
+  const handCount = totalCardCount(playerState.hand || []);
+  const deckCount = totalCardCount(playerState.deck || []);
+  return boardCount + handCount + deckCount;
 }
 
 function summarizeMatch(match, viewer) {
   const maskHand = (hand) => hand.map((card) => ({ slug: card.slug, count: card.count }));
+  const maskDeck = (deck) => deck.map((card) => ({ slug: card.slug, count: card.count }));
   refreshPieceTerritories(match);
   const territories = territoryAssignments(match);
   const viewerTerritory = territories[viewer] || territories[match.players[0]] || null;
+  const concealedBoard = match.board.map((row) =>
+    row.map((cell) => {
+      if (!cell) return null;
+      const visible = match.phase !== 'deploy' || cell.owner === viewer;
+      if (visible) return { ...cell };
+      return { owner: cell.owner, hidden: true };
+    })
+  );
+
   const view = {
     id: match.id,
     players: match.players,
     controllers: defaultControllers(match),
     mode: match.mode || 'versus',
     turn: match.turn,
-    board: match.board,
+    board: concealedBoard,
     boardSize: gameConfig.board,
     status: match.status,
+    phase: match.phase || 'deploy',
+    ready: { ...(match.ready || {}) },
+    deployments: { ...(match.deployments || {}) },
+    startingGoals: { ...(match.startingGoals || {}) },
     log: match.log,
     defeated: match.defeated,
     territories,
@@ -433,6 +501,10 @@ function summarizeMatch(match, viewer) {
     view.hands = {
       [match.players[0]]: maskHand(match.hands[match.players[0]]),
       [match.players[1]]: maskHand(match.hands[match.players[1]]),
+    };
+    view.decks = {
+      [match.players[0]]: maskDeck(match.decks?.[match.players[0]] || []),
+      [match.players[1]]: maskDeck(match.decks?.[match.players[1]] || []),
     };
   }
   return view;
@@ -1027,19 +1099,34 @@ app.post('/api/matchmaking/join', requireAuth, async (req, res) => {
       const p1 = matchmakingQueue.shift();
       const p2 = matchmakingQueue.shift();
       const matchId = crypto.randomUUID();
+      const decks = {};
       const hands = {};
-      hands[p1] = JSON.parse(JSON.stringify(player.hand));
+      const startingGoals = {};
+      decks[p1] = cloneHand(player.hand);
       const otherPlayer = await loadPlayer(p2);
-      hands[p2] = JSON.parse(JSON.stringify(otherPlayer.hand));
+      decks[p2] = cloneHand(otherPlayer.hand);
+      hands[p1] = [];
+      hands[p2] = [];
+      const p1Drawn = drawCards(decks[p1], STARTING_HAND_DRAW);
+      const p2Drawn = drawCards(decks[p2], STARTING_HAND_DRAW);
+      addDrawnCardsToHand(hands[p1], p1Drawn);
+      addDrawnCardsToHand(hands[p2], p2Drawn);
+      startingGoals[p1] = p1Drawn.length || STARTING_HAND_DRAW;
+      startingGoals[p2] = p2Drawn.length || STARTING_HAND_DRAW;
       const match = {
         id: matchId,
         players: [p1, p2],
         controllers: { [p1]: p1, [p2]: p2 },
+        decks,
         hands,
+        startingGoals,
         board: createEmptyBoard(),
         turn: p1,
         turnPlays: 0,
         status: 'active',
+        phase: 'deploy',
+        ready: { [p1]: false, [p2]: false },
+        deployments: { [p1]: 0, [p2]: 0 },
         log: [`Match ${matchId} created: ${p1} vs ${p2}`],
         defeated: null,
       };
@@ -1083,21 +1170,34 @@ app.post('/api/practice/start', requireAuth, async (req, res) => {
 
     const matchId = crypto.randomUUID();
     const sparringPartner = `${req.player}-sparring`;
-    const hands = {
-      [req.player]: JSON.parse(JSON.stringify(player.hand)),
-      [sparringPartner]: JSON.parse(JSON.stringify(player.hand)),
+    const decks = {
+      [req.player]: cloneHand(player.hand),
+      [sparringPartner]: cloneHand(player.hand),
     };
+    const hands = { [req.player]: [], [sparringPartner]: [] };
+    const startingGoals = {};
+    const playerDrawn = drawCards(decks[req.player], STARTING_HAND_DRAW);
+    const partnerDrawn = drawCards(decks[sparringPartner], STARTING_HAND_DRAW);
+    addDrawnCardsToHand(hands[req.player], playerDrawn);
+    addDrawnCardsToHand(hands[sparringPartner], partnerDrawn);
+    startingGoals[req.player] = playerDrawn.length || STARTING_HAND_DRAW;
+    startingGoals[sparringPartner] = partnerDrawn.length || STARTING_HAND_DRAW;
 
     const match = {
       id: matchId,
       players: [req.player, sparringPartner],
       controllers: { [req.player]: req.player, [sparringPartner]: req.player },
       mode: 'practice',
+      decks,
       hands,
+      startingGoals,
       board: createEmptyBoard(),
       turn: req.player,
       turnPlays: 0,
       status: 'active',
+      phase: 'deploy',
+      ready: { [req.player]: false, [sparringPartner]: false },
+      deployments: { [req.player]: 0, [sparringPartner]: 0 },
       log: [`Practice match ${matchId} created for ${req.player}.`],
       defeated: null,
     };
@@ -1140,7 +1240,15 @@ app.post('/api/npc/start', requireAuth, async (req, res) => {
 
     const matchId = crypto.randomUUID();
     const npcName = 'warden-npc';
-    const hands = { [req.player]: JSON.parse(JSON.stringify(player.hand)), [npcName]: npcHand };
+    const decks = { [req.player]: cloneHand(player.hand), [npcName]: npcHand };
+    const hands = { [req.player]: [], [npcName]: [] };
+    const startingGoals = {};
+    const playerDrawn = drawCards(decks[req.player], STARTING_HAND_DRAW);
+    const npcDrawn = drawCards(decks[npcName], STARTING_HAND_DRAW);
+    addDrawnCardsToHand(hands[req.player], playerDrawn);
+    addDrawnCardsToHand(hands[npcName], npcDrawn);
+    startingGoals[req.player] = playerDrawn.length || STARTING_HAND_DRAW;
+    startingGoals[npcName] = npcDrawn.length || STARTING_HAND_DRAW;
 
     const match = {
       id: matchId,
@@ -1148,17 +1256,24 @@ app.post('/api/npc/start', requireAuth, async (req, res) => {
       controllers: { [req.player]: req.player, [npcName]: npcName },
       mode: 'npc',
       npc: { name: npcName },
+      decks,
       hands,
+      startingGoals,
       board: createEmptyBoard(),
       turn: req.player,
       turnPlays: 0,
       status: 'active',
+      phase: 'deploy',
+      ready: { [req.player]: false, [npcName]: false },
+      deployments: { [req.player]: 0, [npcName]: 0 },
       log: [`NPC battle ${matchId} created for ${req.player}.`],
       defeated: null,
       npcStats: { damageDealt: 0, damageTaken: 0, recorded: false },
     };
     match.boardPieces = { [req.player]: 0, [npcName]: 0 };
-
+    await placeStartingUnitsFor(match, npcName, match.startingGoals?.[npcName] || STARTING_HAND_DRAW, 1);
+    match.ready[npcName] = true;
+    match.log.push('The Warden has readied their forces.');
     matches.set(matchId, match);
     res.status(201).json({ message: 'NPC battle ready. Open the battlefield to face the Warden.', match: summarizeMatch(match, req.player) });
   } catch (error) {
@@ -1246,6 +1361,27 @@ function opponentOf(match, player) {
   return match.players.find((p) => p !== player) || player;
 }
 
+function awakenDeployedUnits(match) {
+  match.board.forEach((row) => {
+    row.forEach((cell) => {
+      if (cell) cell.summoningSickness = false;
+    });
+  });
+}
+
+function startTurn(match, player, { initial = false } = {}) {
+  match.turn = player;
+  match.turnPlays = 0;
+  match.hands[player] = match.hands[player] || [];
+  const drawn = drawCards(match.decks?.[player] || [], 1);
+  if (drawn.length) {
+    addDrawnCardsToHand(match.hands[player], drawn);
+    match.log.push(`${player} drew a card${initial ? ' to start the battle' : ''}.`);
+  } else {
+    match.log.push(`${player} has no more cards to draw.`);
+  }
+}
+
 function endTurn(match, actingPlayer) {
   match.board.forEach((row) => {
     row.forEach((cell) => {
@@ -1258,8 +1394,7 @@ function endTurn(match, actingPlayer) {
 
   clearExpiredEffects(match, actingPlayer);
 
-  match.turn = opponentOf(match, actingPlayer);
-  match.turnPlays = 0;
+  startTurn(match, opponentOf(match, actingPlayer));
   match.log.push(`${actingPlayer} ended their turn.`);
 }
 
@@ -1316,6 +1451,30 @@ function choosePlacementCell(match, target, aggression = 1, owner = null) {
   return sorted[Math.floor(Math.random() * bucket)] || sorted[0];
 }
 
+async function placeStartingUnitsFor(match, player, goal = STARTING_HAND_DRAW, aggressionOverride = null) {
+  const hand = match.hands[player] || [];
+  const deployments = match.deployments || {};
+  const targetEnemy = findNearestEnemy(match, player, { row: 0, col: 0 });
+  const memory = aggressionOverride == null ? await loadNpcMemory() : null;
+  const aggression = aggressionOverride ?? computeAggression(memory || {});
+
+  while ((deployments[player] || 0) < goal) {
+    const available = hand.find((entry) => entry.count > 0);
+    if (!available) break;
+    const card = await getCardBySlug(available.slug);
+    const cell = choosePlacementCell(match, targetEnemy, aggression, player) || findEmptyCells(match, player)?.[0];
+    if (!card || !cell) break;
+
+    const unit = await buildUnit(card, player);
+    drawCardFromHand(hand, available.slug);
+    match.board[cell.row][cell.col] = unit;
+    updatePieceTerritory(match, cell, unit);
+    deployments[player] = (deployments[player] || 0) + 1;
+    match.boardPieces[player] += 1;
+    match.log.push(`${player} placed a starting unit.`);
+  }
+}
+
 async function npcPlaceCard(match, aggressionOverride = null) {
   const npcName = match.npc?.name;
   if (!npcName || match.turnPlays >= 1) return false;
@@ -1342,8 +1501,11 @@ async function npcPlaceCard(match, aggressionOverride = null) {
   return true;
 }
 
-function computeAggression(memory) {
-  return 1 + (memory.totalDamageDealt - memory.totalDamageTaken) / Math.max(1, memory.totalBattles || 1);
+function computeAggression(memory = {}) {
+  const dealt = memory.totalDamageDealt || 0;
+  const taken = memory.totalDamageTaken || 0;
+  const battles = memory.totalBattles || 1;
+  return 1 + (dealt - taken) / Math.max(1, battles);
 }
 
 function npcMoveToward(match, npcName, position) {
@@ -1611,8 +1773,9 @@ function assertCell(match, row, col) {
 
 function defeatIfEmpty(match, opponent) {
   const boardCount = match.boardPieces[opponent];
-  const handCount = (match.hands[opponent] || []).reduce((sum, entry) => sum + entry.count, 0);
-  if (boardCount + handCount === 0) {
+  const handCount = totalCardCount(match.hands[opponent] || []);
+  const deckCount = totalCardCount(match.decks?.[opponent] || []);
+  if (boardCount + handCount + deckCount === 0) {
     completeMatch(match, opponent, `${opponent} has no remaining units. ${match.turn} wins.`);
   }
 }
@@ -1666,7 +1829,7 @@ app.get('/api/matches/:id', requireAuth, (req, res) => {
   if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
 
   const isNpcTurn =
-    match.mode === 'npc' && match.status === 'active' && match.turn === match.npc?.name;
+    match.mode === 'npc' && match.status === 'active' && match.phase !== 'deploy' && match.turn === match.npc?.name;
   const maybeRunNpc = isNpcTurn ? runNpcTurn(match) : Promise.resolve();
 
   maybeRunNpc
@@ -1684,7 +1847,13 @@ app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
     const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
     if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
-    ensureTurn(match, actingPlayer);
+
+    const inDeploy = match.phase === 'deploy';
+    const startingGoal = match.startingGoals?.[actingPlayer] || STARTING_HAND_DRAW;
+    if (!inDeploy) ensureTurn(match, actingPlayer);
+    if (inDeploy && match.ready?.[actingPlayer]) {
+      throw Object.assign(new Error('You are already readied up.'), { status: 400 });
+    }
 
     const { row, col, cardSlug } = req.body || {};
     assertCell(match, row, col);
@@ -1692,7 +1861,11 @@ app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
     if (!isHomeTerritory(match, actingPlayer, { row, col })) {
       throw Object.assign(new Error('Deployments must stay on your side of the board.'), { status: 400 });
     }
-    if (match.turnPlays >= 1) throw Object.assign(new Error('Only one card can be played each turn.'), { status: 400 });
+    if (!inDeploy && match.turnPlays >= 1)
+      throw Object.assign(new Error('Only one card can be played each turn.'), { status: 400 });
+    if (inDeploy && (match.deployments?.[actingPlayer] || 0) >= startingGoal) {
+      throw Object.assign(new Error('All starting units are already placed.'), { status: 400 });
+    }
 
     const hand = match.hands[actingPlayer] || [];
     const didDraw = drawCardFromHand(hand, cardSlug);
@@ -1704,14 +1877,57 @@ app.post('/api/matches/:id/place', requireAuth, async (req, res) => {
 
     match.board[row][col] = unit;
     updatePieceTerritory(match, { row, col }, unit);
-    match.turnPlays += 1;
+    if (inDeploy) {
+      match.deployments[actingPlayer] = (match.deployments?.[actingPlayer] || 0) + 1;
+    } else {
+      match.turnPlays += 1;
+    }
     match.boardPieces[actingPlayer] += 1;
-    match.log.push(`${actingPlayer} deployed ${card.name} to (${row},${col}).`);
+    const placementLog = inDeploy
+      ? `${actingPlayer} placed a starting unit.`
+      : `${actingPlayer} deployed ${card.name} to (${row},${col}).`;
+    match.log.push(placementLog);
 
     res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
     console.error('Place error:', error.message);
     res.status(error.status || 500).json({ message: error.message || 'Failed to place card.' });
+  }
+});
+
+app.post('/api/matches/:id/ready', requireAuth, async (req, res) => {
+  try {
+    const match = matches.get(req.params.id);
+    if (!match) return res.status(404).json({ message: 'Match not found.' });
+    const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
+    if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
+    ensureActive(match);
+
+    if (match.phase !== 'deploy') {
+      return res.status(400).json({ message: 'Battle has already begun.' });
+    }
+
+    const startingGoal = match.startingGoals?.[actingPlayer] || STARTING_HAND_DRAW;
+    const placed = match.deployments?.[actingPlayer] || 0;
+    if (placed < startingGoal) {
+      return res.status(400).json({ message: 'Place all starting units before readying up.' });
+    }
+
+    match.ready[actingPlayer] = true;
+    match.log.push(`${actingPlayer} is ready.`);
+
+    const everyoneReady = match.players.every((p) => match.ready?.[p]);
+    if (everyoneReady) {
+      match.phase = 'battle';
+      awakenDeployedUnits(match);
+      match.log.push('Starting units revealed.');
+      startTurn(match, match.turn, { initial: true });
+    }
+
+    res.json({ match: summarizeMatch(match, actingPlayer) });
+  } catch (error) {
+    console.error('Ready up error:', error.message);
+    res.status(error.status || 500).json({ message: error.message || 'Failed to ready up.' });
   }
 });
 
@@ -1722,6 +1938,7 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
     const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
     if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
+    if (match.phase === 'deploy') throw Object.assign(new Error('Finish deployment before moving.'), { status: 400 });
     ensureTurn(match, actingPlayer);
 
     const { fromRow, fromCol, toRow, toCol } = req.body || {};
@@ -1757,6 +1974,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
     const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
     if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
+    if (match.phase === 'deploy') throw Object.assign(new Error('Finish deployment before attacking.'), { status: 400 });
     ensureTurn(match, actingPlayer);
 
     const { fromRow, fromCol, targetRow, targetCol, abilitySlug } = req.body || {};
@@ -1857,6 +2075,9 @@ app.post('/api/matches/:id/end-turn', requireAuth, async (req, res) => {
     const actingPlayer = resolveActingPlayer(match, req.player, req.headers['x-player-role']);
     if (!actingPlayer) return res.status(403).json({ message: 'Not a participant.' });
     ensureActive(match);
+    if (match.phase === 'deploy') {
+      return res.status(400).json({ message: 'Both players must ready up before turns can end.' });
+    }
 
     if (match.mode === 'npc' && match.turn === match.npc?.name && actingPlayer !== match.turn) {
       if (match.processingNpcTurn) {

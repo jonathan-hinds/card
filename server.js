@@ -14,6 +14,10 @@ const DATABASE_NAME = process.env.MONGO_DB_NAME || 'card-battles';
 const TOKEN_SECRET = process.env.TOKEN_SECRET || 'dev-secret-token';
 
 const TARGET_TYPES = new Set(['enemy', 'friendly', 'any']);
+const EFFECT_PRIORITY = new Map([
+  ['damage-boost-turn', 3],
+  ['stamina-sapped-turn', 2],
+]);
 let effectMap = new Map();
 
 let usersCollection;
@@ -1312,7 +1316,7 @@ function choosePlacementCell(match, target, aggression = 1, owner = null) {
   return sorted[Math.floor(Math.random() * bucket)] || sorted[0];
 }
 
-async function npcPlaceCard(match) {
+async function npcPlaceCard(match, aggressionOverride = null) {
   const npcName = match.npc?.name;
   if (!npcName || match.turnPlays >= 1) return false;
   const hand = match.hands[npcName] || [];
@@ -1323,8 +1327,8 @@ async function npcPlaceCard(match) {
   if (!card) return false;
 
   const targetEnemy = findNearestEnemy(match, npcName, { row: 0, col: 0 });
-  const memory = await loadNpcMemory();
-  const aggression = 1 + (memory.totalDamageDealt - memory.totalDamageTaken) / Math.max(1, memory.totalBattles || 1);
+  const memory = aggressionOverride == null ? await loadNpcMemory() : null;
+  const aggression = aggressionOverride ?? computeAggression(memory);
   const cell = choosePlacementCell(match, targetEnemy, aggression, npcName);
   if (!cell) return false;
 
@@ -1336,6 +1340,10 @@ async function npcPlaceCard(match) {
   match.boardPieces[npcName] += 1;
   match.log.push(`${npcName} deployed ${card.name} to (${cell.row},${cell.col}).`);
   return true;
+}
+
+function computeAggression(memory) {
+  return 1 + (memory.totalDamageDealt - memory.totalDamageTaken) / Math.max(1, memory.totalBattles || 1);
 }
 
 function npcMoveToward(match, npcName, position) {
@@ -1366,28 +1374,115 @@ function npcMoveToward(match, npcName, position) {
   return true;
 }
 
-function npcAbilityTarget(match, npcName, position, ability) {
+function npcAbilityTargets(match, npcName, position, ability) {
   const range = ability.range ?? ability.attackRange ?? 1;
+  const targetType = TARGET_TYPES.has(ability.targetType) ? ability.targetType : 'enemy';
   const enemies = listPieces(match, opponentOf(match, npcName));
-  return enemies.find((enemy) => {
-    const rowDiff = Math.abs(enemy.row - position.row);
-    const colDiff = Math.abs(enemy.col - position.col);
+  const allies = listPieces(match, npcName);
+  const candidates = [];
+
+  const withinRange = (piece) => {
+    const rowDiff = Math.abs(piece.row - position.row);
+    const colDiff = Math.abs(piece.col - position.col);
     return Math.max(rowDiff, colDiff) <= range;
-  });
+  };
+
+  if (targetType === 'enemy' || targetType === 'any') {
+    candidates.push(...enemies.filter(withinRange));
+  }
+
+  if (targetType === 'friendly' || targetType === 'any') {
+    candidates.push(...allies.filter(withinRange));
+  }
+
+  return candidates;
 }
 
-async function npcAttack(match, npcName, position) {
+function expectedDamageOutput(ability, attacker) {
+  if (!ability?.damage) return 0;
+  const damageMin = ability.damage?.min ?? 0;
+  const damageMax = ability.damage?.max ?? damageMin;
+  let expected = (damageMin + damageMax) / 2;
+
+  const bonuses = (attacker.activeEffects || [])
+    .map((effect) => effect.modifiers?.damageBonus)
+    .filter(Boolean);
+
+  bonuses.forEach((bonus) => {
+    const min = bonus.min ?? 0;
+    const max = bonus.max ?? min;
+    expected += (min + max) / 2;
+  });
+
+  return Math.max(0, expected);
+}
+
+function scoreAbilityChoice(ability, attacker, targetPosition, aggression) {
+  const staminaCost = abilityStaminaCost(attacker, ability);
+  const target = targetPosition?.unit;
+  if (!target) return -Infinity;
+
+  const damagePotential = expectedDamageOutput(ability, attacker);
+  const isEnemyTarget = target.owner !== attacker.owner;
+  let score = 0;
+
+  if (isEnemyTarget) {
+    score += damagePotential * Math.max(1, aggression);
+    if (damagePotential >= target.health) {
+      score += target.health + 3; // prioritize finishing blows
+    }
+  }
+
+  if (!isEnemyTarget) {
+    const effectValue = (ability.effects || []).reduce(
+      (total, slug) => total + (EFFECT_PRIORITY.get(slug) || 1),
+      0
+    );
+    score += effectValue * 2;
+    if (target.health < target.maxHealth) score += 1; // prefer supporting damaged allies
+  }
+
+  if (ability.effects?.length) {
+    score += ability.effects.length; // small nudge to use utility effects
+  }
+
+  score -= staminaCost * 0.5; // prefer efficient abilities
+
+  return score;
+}
+
+function selectNpcAbility(match, npcName, position, aggression) {
+  const attacker = position.unit;
+  const abilities = attacker.abilityDetails || [];
+  let bestChoice = null;
+  let bestScore = -Infinity;
+
+  for (const ability of abilities) {
+    const staminaCost = abilityStaminaCost(attacker, ability);
+    if (attacker.stamina < staminaCost) continue;
+
+    const targets = npcAbilityTargets(match, npcName, position, ability);
+    for (const target of targets) {
+      const score = scoreAbilityChoice(ability, attacker, target, aggression);
+      if (score > bestScore) {
+        bestScore = score;
+        bestChoice = { ability, target };
+      }
+    }
+  }
+
+  return bestChoice;
+}
+
+async function npcAttack(match, npcName, position, aggression) {
   const attacker = position.unit;
   if (attacker.summoningSickness) return false;
 
-  const abilitySlug = attacker.abilities?.[0];
-  const ability = attacker.abilityDetails?.find((a) => a.slug === abilitySlug) || attacker.abilityDetails?.[0];
-  if (!ability) return false;
-  const staminaCost = abilityStaminaCost(attacker, ability);
-  if (attacker.stamina < staminaCost) return false;
+  const choice = selectNpcAbility(match, npcName, position, aggression ?? 1);
+  if (!choice) return false;
 
-  const target = npcAbilityTarget(match, npcName, position, ability);
-  if (!target) return false;
+  const { ability, target } = choice;
+  const staminaCost = abilityStaminaCost(attacker, ability);
 
   const damage = calculateDamageRoll(ability, attacker);
   if (damage > 0) {
@@ -1423,14 +1518,17 @@ async function runNpcTurn(match) {
   if (!npcName || match.turn !== npcName || match.status !== 'active') return;
   if (match.processingNpcTurn) return;
 
+  const memory = await loadNpcMemory();
+  const aggression = computeAggression(memory);
+
   match.processingNpcTurn = true;
   try {
-    await npcPlaceCard(match);
+    await npcPlaceCard(match, aggression);
 
     const pieces = listPieces(match, npcName);
     for (const position of pieces) {
       if (match.status !== 'active') break;
-      const didAttack = await npcAttack(match, npcName, position);
+      const didAttack = await npcAttack(match, npcName, position, aggression);
       if (!didAttack) {
         npcMoveToward(match, npcName, position);
       }

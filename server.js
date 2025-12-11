@@ -1414,6 +1414,10 @@ function manhattanDistance(a, b) {
   return Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 }
 
+function chebyshevDistance(a, b) {
+  return Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col));
+}
+
 function findNearestEnemy(match, owner, from) {
   const opponents = listPieces(match, opponentOf(match, owner));
   let best = null;
@@ -1515,10 +1519,16 @@ function npcMoveToward(match, npcName, position) {
   const target = findNearestEnemy(match, npcName, position);
   if (!target) return false;
 
+  const bestOffense = selectBestOffensiveAbility(unit);
+  const preferredRange = bestOffense?.range ?? 1;
+  const distanceToTarget = chebyshevDistance(target, position);
+  if (distanceToTarget <= preferredRange) return false;
+
   const rowStep = Math.sign(target.row - row);
   const colStep = Math.sign(target.col - col);
-  const nextRow = row + Math.max(-unit.speed, Math.min(unit.speed, rowStep));
-  const nextCol = col + Math.max(-unit.speed, Math.min(unit.speed, colStep));
+  const maxStep = Math.min(unit.speed, distanceToTarget - preferredRange);
+  const nextRow = row + Math.max(-unit.speed, Math.min(unit.speed, rowStep * maxStep));
+  const nextCol = col + Math.max(-unit.speed, Math.min(unit.speed, colStep * maxStep));
 
   if (nextRow === row && nextCol === col) return false;
   if (nextRow < 0 || nextRow >= match.board.length) return false;
@@ -1533,7 +1543,7 @@ function npcMoveToward(match, npcName, position) {
   unit.stamina -= moveCost;
   updatePieceTerritory(match, { row: nextRow, col: nextCol }, unit);
   match.log.push(`${npcName} advanced ${unit.name} to (${nextRow},${nextCol}).`);
-  return true;
+  return { row: nextRow, col: nextCol, unit };
 }
 
 function npcAbilityTargets(match, npcName, position, ability) {
@@ -1579,7 +1589,39 @@ function expectedDamageOutput(ability, attacker) {
   return Math.max(0, expected);
 }
 
-function scoreAbilityChoice(ability, attacker, targetPosition, aggression) {
+function selectBestOffensiveAbility(attacker) {
+  const abilities = attacker.abilityDetails || [];
+  let best = null;
+
+  for (const ability of abilities) {
+    if (!(ability.targetType === 'enemy' || ability.targetType === 'any')) continue;
+    const potential = expectedDamageOutput(ability, attacker);
+    if (potential <= 0) continue;
+
+    if (!best || potential > best.potential) {
+      best = { ability, potential, range: ability.range ?? ability.attackRange ?? 1 };
+    }
+  }
+
+  return best;
+}
+
+function allyCanFollowUp(match, allyPosition) {
+  if (!match?.board) return false;
+  const ally = allyPosition?.unit;
+  if (!ally || ally.summoningSickness || ally.stamina <= 0) return false;
+
+  const enemies = listPieces(match, opponentOf(match, ally.owner));
+  return (ally.abilityDetails || []).some((ability) => {
+    if (!(ability.targetType === 'enemy' || ability.targetType === 'any')) return false;
+    const abilityCost = abilityStaminaCost(ally, ability);
+    if (ally.stamina < abilityCost) return false;
+
+    return enemies.some((enemy) => chebyshevDistance(enemy, allyPosition) <= (ability.range ?? 1));
+  });
+}
+
+function scoreAbilityChoice(ability, attacker, targetPosition, aggression, match) {
   const staminaCost = abilityStaminaCost(attacker, ability);
   const target = targetPosition?.unit;
   if (!target) return -Infinity;
@@ -1602,6 +1644,10 @@ function scoreAbilityChoice(ability, attacker, targetPosition, aggression) {
     );
     score += effectValue * 2;
     if (target.health < target.maxHealth) score += 1; // prefer supporting damaged allies
+
+    const followUpPotential = allyCanFollowUp(match, targetPosition);
+    if (followUpPotential) score += 3; // prefer buffs that enable immediate strikes
+    if (target === attacker) score += 1; // self-buffs are efficient when possible
   }
 
   if (ability.effects?.length) {
@@ -1625,7 +1671,7 @@ function selectNpcAbility(match, npcName, position, aggression) {
 
     const targets = npcAbilityTargets(match, npcName, position, ability);
     for (const target of targets) {
-      const score = scoreAbilityChoice(ability, attacker, target, aggression);
+      const score = scoreAbilityChoice(ability, attacker, target, aggression, match);
       if (score > bestScore) {
         bestScore = score;
         bestChoice = { ability, target };
@@ -1688,11 +1734,23 @@ async function runNpcTurn(match) {
     await npcPlaceCard(match, aggression);
 
     const pieces = listPieces(match, npcName);
-    for (const position of pieces) {
+    for (const startingPosition of pieces) {
       if (match.status !== 'active') break;
-      const didAttack = await npcAttack(match, npcName, position, aggression);
-      if (!didAttack) {
-        npcMoveToward(match, npcName, position);
+
+      let position = startingPosition;
+      let safety = 0;
+      while (match.status === 'active' && position.unit.stamina > 0 && safety < 10) {
+        const didAttack = await npcAttack(match, npcName, position, aggression);
+        if (didAttack) {
+          safety += 1;
+          continue;
+        }
+
+        const moved = npcMoveToward(match, npcName, position);
+        if (!moved) break;
+
+        position = moved;
+        safety += 1;
       }
     }
 

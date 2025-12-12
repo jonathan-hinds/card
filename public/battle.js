@@ -42,6 +42,41 @@ const highlights = { moves: new Set(), range: new Set(), targets: new Set() };
 
 const coordKey = (row, col) => `${row},${col}`;
 
+function buildTerritoryLookup(territories = {}) {
+  const lookup = new Map();
+  Object.entries(territories).forEach(([, territory]) => {
+    (territory.cells || []).forEach((cell) => {
+      if (!territory.owner) return;
+      lookup.set(coordKey(cell.row, cell.col), territory.owner);
+    });
+  });
+  return lookup;
+}
+
+function territoryOwner(row, col) {
+  const key = coordKey(row, col);
+  return activeMatch?.territoryLookup?.get(key) || null;
+}
+
+function isHomeCell(row, col) {
+  return territoryOwner(row, col) === currentSide;
+}
+
+function outposts() {
+  return activeMatch?.outposts || [];
+}
+
+function outpostAt(row, col) {
+  return outposts().find((outpost) => outpost.cells.some((cell) => cell.row === row && cell.col === col));
+}
+
+function outpostHasRoom(outpost, movingOutpostId = '') {
+  if (!outpost) return false;
+  const occupants = outpost.occupants || [];
+  const effectiveCount = occupants.filter((occ) => occ.inOutpost?.outpostId !== movingOutpostId).length;
+  return effectiveCount < (outpost.capacity || 2);
+}
+
 function perspective() {
   return activeMatch?.perspective || { flipped: false, homeRows: null };
 }
@@ -63,7 +98,8 @@ function homeTerritory() {
   return activeMatch.territories[currentSide] || null;
 }
 
-function isHomeRow(row) {
+function isHomeRow(row, col = null) {
+  if (col !== null) return isHomeCell(row, col);
   const territory = homeTerritory();
   if (!territory?.rows) return false;
   return row >= territory.rows.start && row <= territory.rows.end;
@@ -188,7 +224,25 @@ function renderBoard(board) {
       cellEl.classList.add('selected');
     }
 
-    cellEl.classList.add(isHomeRow(row) ? 'home-territory' : 'enemy-territory');
+    const cellOwner = territoryOwner(row, col);
+    if (cellOwner === currentSide) cellEl.classList.add('home-territory');
+    else if (cellOwner) cellEl.classList.add('enemy-territory');
+    else cellEl.classList.add('neutral-territory');
+
+    const outpost = outpostAt(row, col);
+    if (outpost) {
+      cellEl.classList.add('outpost-cell');
+      const badge = document.createElement('span');
+      badge.className = 'outpost-badge';
+      badge.textContent = outpost.name;
+      cellEl.appendChild(badge);
+      if (outpost.owner) {
+        const ownerTag = document.createElement('span');
+        ownerTag.className = 'outpost-owner';
+        ownerTag.textContent = `Held by ${outpost.owner}`;
+        badge.appendChild(ownerTag);
+      }
+    }
 
     if (cell) {
       const isHidden = Boolean(cell.hidden);
@@ -316,6 +370,18 @@ function parseLogLine(line) {
       actor: { player: actorPlayer, unit: actorUnit },
       target: { player: targetPlayer, unit: targetUnit },
       detail: [damageText, effectText].filter(Boolean).join(' · '),
+    };
+  }
+
+  const outpostMoveMatch = line.match(/^(.+) moved (.+) to (.+ Outpost)\.$/);
+  if (outpostMoveMatch) {
+    const [, actorPlayer, unit, destination] = outpostMoveMatch;
+    return {
+      type: 'move',
+      title: 'Movement',
+      action: 'Station',
+      actor: { player: actorPlayer, unit },
+      detail: `New position: ${destination}`,
     };
   }
 
@@ -507,9 +573,10 @@ function describePiece(piece) {
   if (!piece) return '';
   const sickness = piece.summoningSickness ? ' · Summoning Sickness' : '';
   const territory = piece.enemyTerritory ? ' · Enemy Territory (+1 STA actions)' : '';
+  const outpost = piece.inOutpost ? ' · Occupying Outpost (no attacks)' : '';
   const primary = getPrimaryAbility(piece);
   const rangeText = primary.range ? ` · RNG ${primary.range}` : '';
-  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}${territory}`;
+  return `HP ${piece.health} · STA ${piece.stamina}/${piece.staminaMax} · SPD ${piece.speed}${rangeText}${sickness}${territory}${outpost}`;
 }
 
 function buildAbilityMeta(ability) {
@@ -533,6 +600,14 @@ function renderAbilityActions(piece) {
     empty.className = 'muted small-text';
     empty.textContent = 'No abilities available';
     overlayAbilities.appendChild(empty);
+    return;
+  }
+
+  if (piece?.inOutpost) {
+    const notice = document.createElement('p');
+    notice.className = 'muted small-text';
+    notice.textContent = 'This unit is stationed at an outpost and cannot use abilities. Move it out to act.';
+    overlayAbilities.appendChild(notice);
     return;
   }
 
@@ -642,6 +717,8 @@ function updateSideSelector(match) {
 
 function renderMatch(match) {
   activeMatch = match;
+  activeMatch.outposts = match.outposts || [];
+  activeMatch.territoryLookup = buildTerritoryLookup(match.territories || {});
   updateSideSelector(match);
   renderBoard(match.board);
   renderLog(match.log);
@@ -695,13 +772,17 @@ function boardSize() {
 function calculateMoves(piece, position) {
   const { rows, cols } = boardSize();
   const spaces = [];
+  const origin = piece?.inOutpost?.entryFrom || position;
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
-      const rowDiff = Math.abs(position.row - r);
-      const colDiff = Math.abs(position.col - c);
+      const rowDiff = Math.abs(origin.row - r);
+      const colDiff = Math.abs(origin.col - c);
       const distance = Math.max(rowDiff, colDiff);
       if (distance === 0 || distance > piece.speed) continue;
       if (activeMatch.board[r][c]) continue;
+      const outpost = outpostAt(r, c);
+      if (piece?.inOutpost && outpost) continue;
+      if (outpost && !outpostHasRoom(outpost, piece?.inOutpost?.outpostId || '')) continue;
       spaces.push({ row: r, col: c });
     }
   }
@@ -749,9 +830,12 @@ function selectUnit(row, col) {
     return;
   }
   const hasStamina = cardHasStamina(piece);
-  metaEl.textContent = hasStamina
-    ? 'Choose Move or an ability to act with this unit.'
-    : `${piece?.name || 'This unit'} is out of stamina.`;
+  const stationed = Boolean(piece.inOutpost);
+  metaEl.textContent = stationed
+    ? 'Outpost occupants must move out before taking other actions.'
+    : hasStamina
+      ? 'Choose Move or an ability to act with this unit.'
+      : `${piece?.name || 'This unit'} is out of stamina.`;
   if (!hasStamina) showStaminaBanner(metaEl.textContent);
   updateOverlay();
   renderBoard(activeMatch.board);
@@ -836,7 +920,7 @@ boardEl.addEventListener('click', (event) => {
   const cell = activeMatch.board[row][col];
 
   if (currentMode === 'place' && selectedHandSlug) {
-    if (!isHomeRow(row)) {
+    if (!isHomeCell(row, col)) {
       metaEl.textContent = 'You can only deploy units on your side of the battlefield.';
     } else if (!cell) placeCard(row, col);
     else metaEl.textContent = 'Tile occupied. Choose another spot to deploy.';

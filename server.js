@@ -32,6 +32,8 @@ let npcMemoryCollection;
 const matchmakingQueue = [];
 const matches = new Map();
 
+const OUTPOST_CAPACITY = 2;
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -286,6 +288,94 @@ function cleanCardStats(stats) {
   };
 }
 
+function coordKey(position) {
+  return `${position.row},${position.col}`;
+}
+
+function createOutposts(board = gameConfig.board) {
+  const midTop = Math.floor(board.rows / 2) - 1;
+  const midBottom = midTop + 1;
+  const build = (id, startCol) => {
+    const cells = [];
+    for (let r = midTop; r <= midBottom; r += 1) {
+      for (let c = startCol; c < startCol + 2; c += 1) {
+        cells.push({ row: r, col: c });
+      }
+    }
+    return {
+      id,
+      name: id === 'west' ? 'Western Outpost' : 'Eastern Outpost',
+      cells,
+      capacity: OUTPOST_CAPACITY,
+    };
+  };
+
+  const leftStart = Math.max(1, Math.floor(board.cols * 0.1));
+  const rightStart = Math.max(board.cols - 3, leftStart + 2);
+  return [build('west', leftStart), build('east', rightStart)];
+}
+
+function outpostInfluenceCells(outpost, board = gameConfig.board) {
+  const occupied = new Set(outpost.cells.map((cell) => coordKey(cell)));
+  const minRow = Math.max(0, Math.min(...outpost.cells.map((cell) => cell.row)) - 1);
+  const maxRow = Math.min(board.rows - 1, Math.max(...outpost.cells.map((cell) => cell.row)) + 1);
+  const minCol = Math.max(0, Math.min(...outpost.cells.map((cell) => cell.col)) - 1);
+  const maxCol = Math.min(board.cols - 1, Math.max(...outpost.cells.map((cell) => cell.col)) + 1);
+
+  const ring = [];
+  for (let r = minRow; r <= maxRow; r += 1) {
+    for (let c = minCol; c <= maxCol; c += 1) {
+      const key = `${r},${c}`;
+      if (occupied.has(key)) continue;
+      ring.push({ row: r, col: c });
+    }
+  }
+  return ring;
+}
+
+function findOutpostByCell(match, position) {
+  const outposts = match.outposts?.length ? match.outposts : createOutposts();
+  return outposts.find((outpost) => outpost.cells.some((cell) => cell.row === position.row && cell.col === position.col));
+}
+
+function outpostState(match) {
+  const outposts = match.outposts?.length ? match.outposts : createOutposts();
+  const state = outposts.map((outpost) => ({
+    ...outpost,
+    ring: outpostInfluenceCells(outpost),
+    occupants: [],
+    owner: null,
+  }));
+  const byId = new Map(state.map((entry) => [entry.id, entry]));
+
+  match.board.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (!cell?.inOutpost?.outpostId) return;
+      const outpost = byId.get(cell.inOutpost.outpostId);
+      if (!outpost) return;
+      outpost.occupants.push({
+        row: r,
+        col: c,
+        owner: cell.owner,
+        unit: cell,
+      });
+    });
+  });
+
+  state.forEach((entry) => {
+    const ownerCounts = entry.occupants.reduce((map, occ) => {
+      map[occ.owner] = (map[occ.owner] || 0) + 1;
+      return map;
+    }, {});
+    const sortedOwners = Object.entries(ownerCounts).sort((a, b) => b[1] - a[1]);
+    if (sortedOwners.length && (sortedOwners.length === 1 || sortedOwners[0][1] > sortedOwners[1][1])) {
+      entry.owner = sortedOwners[0][0];
+    }
+  });
+
+  return state;
+}
+
 function buildActiveEffect(effect, turnOwner) {
   return {
     slug: effect.slug,
@@ -297,36 +387,65 @@ function buildActiveEffect(effect, turnOwner) {
 
 function territoryAssignments(match) {
   const totalRows = match.board?.length || gameConfig.board.rows;
+  const totalCols = match.board?.[0]?.length || gameConfig.board.cols;
   const half = Math.floor(totalRows / 2);
   const assignments = {};
   const [northPlayer, southPlayer] = match.players;
+  const outposts = outpostState(match);
+  const outpostCells = new Set(outposts.flatMap((outpost) => outpost.cells.map((cell) => coordKey(cell))));
 
-  if (northPlayer) {
-    assignments[northPlayer] = { side: 'north', rows: { start: 0, end: Math.max(0, half - 1) } };
-  }
-
-  if (southPlayer) {
-    assignments[southPlayer] = {
-      side: 'south',
-      rows: { start: Math.max(0, totalRows - half), end: Math.max(0, totalRows - 1) },
+  const addCell = (owner, row, col) => {
+    assignments[owner] = assignments[owner] || {
+      owner,
+      side: owner === northPlayer ? 'north' : 'south',
+      rows: owner === northPlayer
+        ? { start: 0, end: Math.max(0, half - 1) }
+        : { start: Math.max(0, totalRows - half), end: Math.max(0, totalRows - 1) },
+      cells: new Set(),
     };
+    assignments[owner].cells.add(coordKey({ row, col }));
+  };
+
+  for (let r = 0; r < totalRows; r += 1) {
+    for (let c = 0; c < totalCols; c += 1) {
+      const key = coordKey({ row: r, col: c });
+      if (outpostCells.has(key)) continue;
+      if (northPlayer && r <= half - 1) addCell(northPlayer, r, c);
+      if (southPlayer && r >= totalRows - half) addCell(southPlayer, r, c);
+    }
   }
+
+  outposts.forEach((outpost) => {
+    if (!outpost.owner) return;
+    outpost.ring.forEach((cell) => {
+      const key = coordKey(cell);
+      if (outpostCells.has(key)) return;
+      Object.values(assignments).forEach((territory) => territory.cells.delete(key));
+      addCell(outpost.owner, cell.row, cell.col);
+    });
+  });
 
   return assignments;
 }
 
+function territoryOwner(match, position) {
+  const assignments = territoryAssignments(match);
+  const key = coordKey(position);
+  const owner = Object.entries(assignments).find(([, territory]) => territory.cells?.has(key));
+  return owner ? owner[0] : null;
+}
+
 function isHomeTerritory(match, player, position) {
   if (!match || !player || position?.row === undefined) return false;
-  const assignments = territoryAssignments(match);
-  const territory = assignments[player];
-  if (!territory) return false;
-  return position.row >= territory.rows.start && position.row <= territory.rows.end;
+  return territoryOwner(match, position) === player;
 }
 
 function homeTerritoryDepth(match, player, position) {
   const assignments = territoryAssignments(match);
   const territory = assignments[player];
   if (!territory) return 0;
+  const inTerritory = territory.cells?.has(coordKey(position));
+  if (!inTerritory) return 0;
 
   if (territory.side === 'north') {
     return Math.max(0, territory.rows.end - position.row);
@@ -341,13 +460,14 @@ function homeTerritoryDepth(match, player, position) {
 
 function updatePieceTerritory(match, position, piece) {
   if (!piece) return;
-  piece.enemyTerritory = !isHomeTerritory(match, piece.owner, position);
+  const owner = territoryOwner(match, position);
+  piece.enemyTerritory = owner ? owner !== piece.owner : false;
 }
 
 function refreshPieceTerritories(match) {
   if (!match?.board) return;
   match.board.forEach((row, r) => {
-    row.forEach((cell) => updatePieceTerritory(match, { row: r }, cell));
+    row.forEach((cell, c) => updatePieceTerritory(match, { row: r, col: c }, cell));
   });
 }
 
@@ -481,7 +601,18 @@ function summarizeMatch(match, viewer) {
   const maskDeck = (deck) => deck.map((card) => ({ slug: card.slug, count: card.count }));
   refreshPieceTerritories(match);
   const territories = territoryAssignments(match);
-  const viewerTerritory = territories[viewer] || territories[match.players[0]] || null;
+  const serializedTerritories = Object.entries(territories).reduce((acc, [owner, data]) => {
+    acc[owner] = {
+      ...data,
+      owner,
+      cells: Array.from(data.cells || []).map((key) => {
+        const [row, col] = key.split(',').map(Number);
+        return { row, col };
+      }),
+    };
+    return acc;
+  }, {});
+  const viewerTerritory = serializedTerritories[viewer] || serializedTerritories[match.players[0]] || null;
   const concealedBoard = match.board.map((row) =>
     row.map((cell) => {
       if (!cell) return null;
@@ -490,6 +621,22 @@ function summarizeMatch(match, viewer) {
       return { owner: cell.owner, hidden: true };
     })
   );
+
+  const outposts = outpostState(match).map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    cells: entry.cells,
+    ring: entry.ring,
+    capacity: entry.capacity,
+    owner: entry.owner,
+    occupants: entry.occupants.map((occ) => {
+      const visible = match.phase !== 'deploy' || occ.owner === viewer;
+      const unit = visible
+        ? { ...occ.unit }
+        : { owner: occ.owner, hidden: true, inOutpost: occ.unit?.inOutpost };
+      return { ...unit, row: occ.row, col: occ.col };
+    }),
+  }));
 
   const view = {
     id: match.id,
@@ -506,7 +653,8 @@ function summarizeMatch(match, viewer) {
     startingGoals: { ...(match.startingGoals || {}) },
     log: match.log,
     defeated: match.defeated,
-    territories,
+    territories: serializedTerritories,
+    outposts,
     perspective: {
       homeSide: viewerTerritory?.side || 'south',
       flipped: viewerTerritory?.side === 'north',
@@ -1137,6 +1285,7 @@ app.post('/api/matchmaking/join', requireAuth, async (req, res) => {
         hands,
         startingGoals,
         board: createEmptyBoard(),
+        outposts: createOutposts(gameConfig.board),
         turn: p1,
         turnPlays: 0,
         status: 'active',
@@ -1208,6 +1357,7 @@ app.post('/api/practice/start', requireAuth, async (req, res) => {
       hands,
       startingGoals,
       board: createEmptyBoard(),
+      outposts: createOutposts(gameConfig.board),
       turn: req.player,
       turnPlays: 0,
       status: 'active',
@@ -1276,6 +1426,7 @@ app.post('/api/npc/start', requireAuth, async (req, res) => {
       hands,
       startingGoals,
       board: createEmptyBoard(),
+      outposts: createOutposts(gameConfig.board),
       turn: req.player,
       turnPlays: 0,
       status: 'active',
@@ -2080,21 +2231,41 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
     const { fromRow, fromCol, toRow, toCol } = req.body || {};
     assertCell(match, fromRow, fromCol);
     assertCell(match, toRow, toCol);
+    refreshPieceTerritories(match);
     const piece = match.board[fromRow][fromCol];
     if (!piece || piece.owner !== actingPlayer) throw Object.assign(new Error('No piece to move.'), { status: 400 });
     if (piece.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
     const moveCost = effectiveActionCost(piece, 1);
     if (piece.stamina < moveCost) throw Object.assign(new Error('Not enough stamina to move.'), { status: 400 });
-    if (!canMovePiece(piece, { row: fromRow, col: fromCol }, { row: toRow, col: toCol })) {
+    const origin = piece.inOutpost?.entryFrom || { row: fromRow, col: fromCol };
+    if (!canMovePiece(piece, origin, { row: toRow, col: toCol })) {
       throw Object.assign(new Error('Move exceeds speed.'), { status: 400 });
+    }
+    const targetOutpost = findOutpostByCell(match, { row: toRow, col: toCol });
+    const originOutpostId = piece.inOutpost?.outpostId;
+    if (originOutpostId && targetOutpost?.id === originOutpostId) {
+      throw Object.assign(new Error('Move out of the outpost to re-enter play.'), { status: 400 });
+    }
+
+    if (targetOutpost) {
+      const state = outpostState(match).find((entry) => entry.id === targetOutpost.id);
+      const occupied = state?.occupants?.length || 0;
+      if (occupied >= (targetOutpost.capacity || OUTPOST_CAPACITY)) {
+        throw Object.assign(new Error('Outpost already has maximum occupants.'), { status: 400 });
+      }
     }
     if (match.board[toRow][toCol]) throw Object.assign(new Error('Destination occupied.'), { status: 400 });
 
     match.board[toRow][toCol] = piece;
     match.board[fromRow][fromCol] = null;
     piece.stamina -= moveCost;
+    piece.inOutpost = targetOutpost
+      ? { outpostId: targetOutpost.id, entryFrom: origin }
+      : null;
     updatePieceTerritory(match, { row: toRow, col: toCol }, piece);
-    match.log.push(`${actingPlayer} moved ${piece.name} to (${toRow},${toCol}).`);
+    refreshPieceTerritories(match);
+    const destination = targetOutpost ? targetOutpost.name : `(${toRow},${toCol})`;
+    match.log.push(`${actingPlayer} moved ${piece.name} to ${destination}.`);
 
     res.json({ match: summarizeMatch(match, actingPlayer) });
   } catch (error) {
@@ -2121,6 +2292,7 @@ app.post('/api/matches/:id/attack', requireAuth, async (req, res) => {
     const target = match.board[targetRow][targetCol];
     if (!attacker || attacker.owner !== actingPlayer) throw Object.assign(new Error('No attacker selected.'), { status: 400 });
     if (attacker.summoningSickness) throw Object.assign(new Error('Piece cannot act on the turn it was placed.'), { status: 400 });
+    if (attacker.inOutpost) throw Object.assign(new Error('Stationed units cannot attack from an outpost.'), { status: 400 });
     if (!target) throw Object.assign(new Error('No target at location.'), { status: 400 });
 
     const chosenAbilitySlug = abilitySlug || (attacker.abilities || [])[0] || 'basic-attack';

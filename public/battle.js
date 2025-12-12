@@ -70,6 +70,63 @@ function outpostAt(row, col) {
   return outposts().find((outpost) => outpost.cells.some((cell) => cell.row === row && cell.col === col));
 }
 
+function outpostAnchor(outpost) {
+  if (!outpost) return null;
+  if (outpost.origin) return outpost.origin;
+  const anchor = outpost.cells.reduce((best, cell) => {
+    if (!best) return cell;
+    if (cell.row < best.row) return cell;
+    if (cell.row === best.row && cell.col < best.col) return cell;
+    return best;
+  }, null);
+  return anchor;
+}
+
+function isOutpostAnchor(row, col) {
+  const outpost = outpostAt(row, col);
+  const anchor = outpostAnchor(outpost);
+  return Boolean(anchor && anchor.row === row && anchor.col === col);
+}
+
+function anchorCoords(position) {
+  const outpost = outpostAt(position.row, position.col);
+  if (!outpost) return position;
+  return outpostAnchor(outpost) || position;
+}
+
+function availableOutpostCells(outpost) {
+  if (!outpost) return [];
+  const occupied = new Set((outpost.occupants || []).map((occ) => coordKey(occ.row, occ.col)));
+  return outpost.cells.filter((cell) => !occupied.has(coordKey(cell.row, cell.col)));
+}
+
+function resolveOutpostDestination(outpost, fromPosition = null) {
+  const available = availableOutpostCells(outpost);
+  if (!available.length) return null;
+  if (!fromPosition) return available[0];
+  const sorted = available
+    .map((cell) => ({
+      cell,
+      distance: Math.max(Math.abs(cell.row - fromPosition.row), Math.abs(cell.col - fromPosition.col)),
+    }))
+    .sort((a, b) => a.distance - b.distance);
+  return sorted[0]?.cell || available[0];
+}
+
+function chooseOutpostOccupant(outpost, preferredOwner = '') {
+  const occupants = outpost?.occupants || [];
+  if (!occupants.length) return null;
+  if (occupants.length === 1) return occupants[0];
+  const preferred = occupants.find((occ) => occ.owner === preferredOwner);
+  if (preferred) return preferred;
+  const choice = window.prompt(
+    'Select an outpost occupant to target:\n' +
+      occupants.map((occ, idx) => `${idx + 1}: ${occ.owner} · ${occ.name || occ.slug || 'Unit'}`).join('\n')
+  );
+  const index = Number(choice) - 1;
+  return Number.isInteger(index) && index >= 0 && index < occupants.length ? occupants[index] : null;
+}
+
 function outpostHasRoom(outpost, movingOutpostId = '') {
   if (!outpost) return false;
   const occupants = outpost.occupants || [];
@@ -206,124 +263,180 @@ function renderBoard(board) {
   boardEl.style.setProperty('--board-cols', cols || 1);
   boardEl.innerHTML = '';
 
-  for (let viewRow = 0; viewRow < rows; viewRow += 1) {
-    for (let viewCol = 0; viewCol < cols; viewCol += 1) {
-      const { row, col } = boardCoordsFromView(viewRow, viewCol);
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const { row: viewRow, col: viewCol } = boardCoordsToView(row, col);
+      const outpost = outpostAt(row, col);
+      if (outpost && !isOutpostAnchor(row, col)) continue;
+
       const cell = board?.[row]?.[col];
       const cellEl = document.createElement('button');
       cellEl.type = 'button';
       cellEl.className = 'board-cell';
       cellEl.dataset.row = viewRow;
       cellEl.dataset.col = viewCol;
+      cellEl.style.gridRowStart = viewRow + 1;
+      cellEl.style.gridColumnStart = viewCol + 1;
 
-      const key = coordKey(row, col);
-      if (highlights.moves.has(key)) cellEl.classList.add('highlight-move');
-      if (highlights.range.has(key)) cellEl.classList.add('highlight-range');
-      if (highlights.targets.has(key)) cellEl.classList.add('highlight-target');
-    if (selectedUnit && selectedUnit.row === row && selectedUnit.col === col) {
-      cellEl.classList.add('selected');
-    }
-
-    const cellOwner = territoryOwner(row, col);
-    if (cellOwner === currentSide) cellEl.classList.add('home-territory');
-    else if (cellOwner) cellEl.classList.add('enemy-territory');
-    else cellEl.classList.add('neutral-territory');
-
-    const outpost = outpostAt(row, col);
-    if (outpost) {
-      cellEl.classList.add('outpost-cell');
-      const badge = document.createElement('span');
-      badge.className = 'outpost-badge';
-      badge.textContent = outpost.name;
-      cellEl.appendChild(badge);
-      if (outpost.owner) {
-        const ownerTag = document.createElement('span');
-        ownerTag.className = 'outpost-owner';
-        ownerTag.textContent = `Held by ${outpost.owner}`;
-        badge.appendChild(ownerTag);
-      }
-    }
-
-    if (cell) {
-      const isHidden = Boolean(cell.hidden);
-      cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
-      if (cell.enemyTerritory) cellEl.classList.add('crossing-debuff');
-      const ability = isHidden ? null : getPrimaryAbility(cell);
-      const cardEl = document.createElement('div');
-      cardEl.className = `unit-card ${isHidden ? 'unit-card--hidden' : ''}`;
-
-      const headerEl = document.createElement('div');
-      headerEl.className = 'unit-header';
-      const nameEl = document.createElement('span');
-      nameEl.className = 'unit-name';
-      nameEl.textContent = isHidden ? 'Hidden unit' : cell.name;
-      const ownerEl = document.createElement('span');
-      ownerEl.className = 'unit-owner';
-      ownerEl.textContent = cell.owner;
-      headerEl.append(nameEl, ownerEl);
-
-      const bodyEl = document.createElement('div');
-      bodyEl.className = 'unit-body';
-      const abilityName = document.createElement('p');
-      abilityName.className = 'ability-name';
-      abilityName.textContent = isHidden ? 'Ability concealed' : ability?.title || 'Ability';
-
-      const abilityMeta = document.createElement('div');
-      abilityMeta.className = 'ability-meta';
-
-      const metaItems = [];
-
-      if (!isHidden && ability?.damage) {
-        const abilityDamage = document.createElement('span');
-        abilityDamage.className = 'ability-pill ability-damage';
-        abilityDamage.textContent = `DMG ${ability.damage}`;
-        metaItems.push(abilityDamage);
+      const anchor = anchorCoords({ row, col });
+      const anchorKey = coordKey(anchor.row, anchor.col);
+      if (highlights.moves.has(anchorKey)) cellEl.classList.add('highlight-move');
+      if (highlights.range.has(anchorKey)) cellEl.classList.add('highlight-range');
+      if (highlights.targets.has(anchorKey)) cellEl.classList.add('highlight-target');
+      const selectedAnchor = selectedUnit ? anchorCoords(selectedUnit) : null;
+      if (selectedAnchor && coordKey(selectedAnchor.row, selectedAnchor.col) === anchorKey) {
+        cellEl.classList.add('selected');
       }
 
-      if (!isHidden && ability?.range) {
-        const abilityRange = document.createElement('span');
-        abilityRange.className = 'ability-pill ability-range';
-        abilityRange.textContent = `RNG ${ability.range}`;
-        metaItems.push(abilityRange);
+      const cellOwner = territoryOwner(row, col);
+      if (cellOwner === currentSide) cellEl.classList.add('home-territory');
+      else if (cellOwner) cellEl.classList.add('enemy-territory');
+      else cellEl.classList.add('neutral-territory');
+
+      if (outpost) {
+        cellEl.classList.add('outpost-cell');
+        cellEl.style.gridRowEnd = 'span 2';
+        cellEl.style.gridColumnEnd = 'span 2';
+        const badge = document.createElement('span');
+        badge.className = 'outpost-badge';
+        badge.textContent = outpost.name;
+        cellEl.appendChild(badge);
+        if (outpost.owner) {
+          const ownerTag = document.createElement('span');
+          ownerTag.className = 'outpost-owner';
+          ownerTag.textContent = `Held by ${outpost.owner}`;
+          badge.appendChild(ownerTag);
+        }
+        const occupants = outpost.occupants || [];
+        if (occupants.length) {
+          const stack = document.createElement('div');
+          stack.className = 'outpost-occupants';
+          occupants.forEach((occ) => {
+            const isHidden = Boolean(occ.hidden);
+            const ability = isHidden ? null : getPrimaryAbility(occ);
+            const cardEl = document.createElement('div');
+            cardEl.className = `unit-card ${isHidden ? 'unit-card--hidden' : ''}`;
+
+            const headerEl = document.createElement('div');
+            headerEl.className = 'unit-header';
+            const nameEl = document.createElement('span');
+            nameEl.className = 'unit-name';
+            nameEl.textContent = isHidden ? 'Hidden unit' : occ.name;
+            const ownerEl = document.createElement('span');
+            ownerEl.className = 'unit-owner';
+            ownerEl.textContent = occ.owner;
+            headerEl.append(nameEl, ownerEl);
+
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'unit-body';
+            const abilityName = document.createElement('p');
+            abilityName.className = 'ability-name';
+            abilityName.textContent = isHidden ? 'Ability concealed' : ability?.title || 'Ability';
+
+            const statsEl = document.createElement('div');
+            statsEl.className = 'unit-stats';
+            const hpEl = document.createElement('span');
+            hpEl.textContent = isHidden ? 'HP ???' : `HP ${occ.health}`;
+            const staminaEl = document.createElement('span');
+            staminaEl.textContent = isHidden ? 'STA ???' : `STA ${occ.stamina}/${occ.staminaMax}`;
+            statsEl.append(hpEl, staminaEl);
+
+            bodyEl.appendChild(abilityName);
+            cardEl.append(headerEl, bodyEl, statsEl);
+            cardEl.title = isHidden
+              ? `${occ.owner} · Hidden unit (${formattedCoords({ row: occ.row, col: occ.col })})`
+              : `${occ.owner} · ${occ.name} (${occ.health} hp, ${occ.stamina}/${occ.staminaMax} sta)`;
+            stack.appendChild(cardEl);
+          });
+          cellEl.appendChild(stack);
+        } else {
+          const placeholder = document.createElement('p');
+          placeholder.className = 'muted small-text';
+          placeholder.textContent = 'Unoccupied outpost';
+          cellEl.appendChild(placeholder);
+        }
       }
 
-      if (!isHidden && ability?.cost) {
-        const abilityCost = document.createElement('span');
-        abilityCost.className = 'ability-pill ability-cost';
-        abilityCost.textContent = `COST ${ability.cost}`;
-        metaItems.push(abilityCost);
+      if (!outpost && cell) {
+        const isHidden = Boolean(cell.hidden);
+        cellEl.classList.add(cell.owner === currentSide ? 'owned' : 'enemy');
+        if (cell.enemyTerritory) cellEl.classList.add('crossing-debuff');
+        const ability = isHidden ? null : getPrimaryAbility(cell);
+        const cardEl = document.createElement('div');
+        cardEl.className = `unit-card ${isHidden ? 'unit-card--hidden' : ''}`;
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'unit-header';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'unit-name';
+        nameEl.textContent = isHidden ? 'Hidden unit' : cell.name;
+        const ownerEl = document.createElement('span');
+        ownerEl.className = 'unit-owner';
+        ownerEl.textContent = cell.owner;
+        headerEl.append(nameEl, ownerEl);
+
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'unit-body';
+        const abilityName = document.createElement('p');
+        abilityName.className = 'ability-name';
+        abilityName.textContent = isHidden ? 'Ability concealed' : ability?.title || 'Ability';
+
+        const abilityMeta = document.createElement('div');
+        abilityMeta.className = 'ability-meta';
+
+        const metaItems = [];
+
+        if (!isHidden && ability?.damage) {
+          const abilityDamage = document.createElement('span');
+          abilityDamage.className = 'ability-pill ability-damage';
+          abilityDamage.textContent = `DMG ${ability.damage}`;
+          metaItems.push(abilityDamage);
+        }
+
+        if (!isHidden && ability?.range) {
+          const abilityRange = document.createElement('span');
+          abilityRange.className = 'ability-pill ability-range';
+          abilityRange.textContent = `RNG ${ability.range}`;
+          metaItems.push(abilityRange);
+        }
+
+        if (!isHidden && ability?.cost) {
+          const abilityCost = document.createElement('span');
+          abilityCost.className = 'ability-pill ability-cost';
+          abilityCost.textContent = `COST ${ability.cost}`;
+          metaItems.push(abilityCost);
+        }
+
+        if (!isHidden && ability?.target) {
+          const abilityTarget = document.createElement('span');
+          abilityTarget.className = 'ability-pill ability-target';
+          abilityTarget.textContent = `TARGET ${ability.target}`;
+          metaItems.push(abilityTarget);
+        }
+
+        bodyEl.appendChild(abilityName);
+        if (metaItems.length) {
+          metaItems.forEach((el) => abilityMeta.appendChild(el));
+          bodyEl.appendChild(abilityMeta);
+        }
+
+        const statsEl = document.createElement('div');
+        statsEl.className = 'unit-stats';
+        const hpEl = document.createElement('span');
+        hpEl.textContent = isHidden ? 'HP ???' : `HP ${cell.health}`;
+        const staminaEl = document.createElement('span');
+        staminaEl.textContent = isHidden ? 'STA ???' : `STA ${cell.stamina}/${cell.staminaMax}`;
+        statsEl.append(hpEl, staminaEl);
+
+        cardEl.append(headerEl, bodyEl, statsEl);
+        cellEl.append(cardEl);
+
+        cellEl.title = isHidden
+          ? `${cell.owner} · Hidden unit (${formattedCoords({ row, col })})`
+          : `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
+      } else if (!outpost) {
+        cellEl.title = `${formattedCoords({ row, col })} empty`;
       }
-
-      if (!isHidden && ability?.target) {
-        const abilityTarget = document.createElement('span');
-        abilityTarget.className = 'ability-pill ability-target';
-        abilityTarget.textContent = `TARGET ${ability.target}`;
-        metaItems.push(abilityTarget);
-      }
-
-      bodyEl.appendChild(abilityName);
-      if (metaItems.length) {
-        metaItems.forEach((el) => abilityMeta.appendChild(el));
-        bodyEl.appendChild(abilityMeta);
-      }
-
-      const statsEl = document.createElement('div');
-      statsEl.className = 'unit-stats';
-      const hpEl = document.createElement('span');
-      hpEl.textContent = isHidden ? 'HP ???' : `HP ${cell.health}`;
-      const staminaEl = document.createElement('span');
-      staminaEl.textContent = isHidden ? 'STA ???' : `STA ${cell.stamina}/${cell.staminaMax}`;
-      statsEl.append(hpEl, staminaEl);
-
-      cardEl.append(headerEl, bodyEl, statsEl);
-      cellEl.append(cardEl);
-
-      cellEl.title = isHidden
-        ? `${cell.owner} · Hidden unit (${formattedCoords({ row, col })})`
-        : `${cell.owner} · ${cell.name} (${cell.health} hp, ${cell.stamina}/${cell.staminaMax} sta)`;
-    } else {
-      cellEl.title = `${formattedCoords({ row, col })} empty`;
-    }
 
       boardEl.appendChild(cellEl);
     }
@@ -772,17 +885,35 @@ function boardSize() {
 function calculateMoves(piece, position) {
   const { rows, cols } = boardSize();
   const spaces = [];
+  const seen = new Set();
   const origin = piece?.inOutpost?.entryFrom || position;
   for (let r = 0; r < rows; r += 1) {
     for (let c = 0; c < cols; c += 1) {
+      const outpost = outpostAt(r, c);
+      if (outpost) {
+        if (piece?.inOutpost && outpost) continue;
+        if (!outpostHasRoom(outpost, piece?.inOutpost?.outpostId || '')) continue;
+        const available = availableOutpostCells(outpost);
+        if (!available.length) continue;
+        const reachable = available.some((cell) => {
+          const rowDiff = Math.abs(origin.row - cell.row);
+          const colDiff = Math.abs(origin.col - cell.col);
+          const distance = Math.max(rowDiff, colDiff);
+          return distance > 0 && distance <= piece.speed;
+        });
+        if (!reachable) continue;
+        const anchor = outpostAnchor(outpost);
+        const anchorKey = coordKey(anchor.row, anchor.col);
+        if (seen.has(anchorKey)) continue;
+        seen.add(anchorKey);
+        spaces.push(anchor);
+        continue;
+      }
       const rowDiff = Math.abs(origin.row - r);
       const colDiff = Math.abs(origin.col - c);
       const distance = Math.max(rowDiff, colDiff);
       if (distance === 0 || distance > piece.speed) continue;
       if (activeMatch.board[r][c]) continue;
-      const outpost = outpostAt(r, c);
-      if (piece?.inOutpost && outpost) continue;
-      if (outpost && !outpostHasRoom(outpost, piece?.inOutpost?.outpostId || '')) continue;
       spaces.push({ row: r, col: c });
     }
   }
@@ -793,6 +924,8 @@ function calculateTargets(piece, position, abilityOverride = null) {
   const { rows, cols } = boardSize();
   const range = [];
   const targets = [];
+  const rangeSeen = new Set();
+  const targetSeen = new Set();
   const ability = abilityOverride || piece?.abilityDetails?.[0];
   const abilityRange = getAbilityRangeValue(ability) ?? 1;
   const targetType = ability?.targetType || 'enemy';
@@ -805,12 +938,22 @@ function calculateTargets(piece, position, abilityOverride = null) {
       const colDiff = Math.abs(position.col - c);
       const distance = Math.max(rowDiff, colDiff);
       if (distance === 0 || distance > abilityRange) continue;
-      range.push({ row: r, col: c });
+      const anchor = anchorCoords({ row: r, col: c });
+      const anchorKey = coordKey(anchor.row, anchor.col);
+      if (!rangeSeen.has(anchorKey)) {
+        range.push(anchor);
+        rangeSeen.add(anchorKey);
+      }
       const occupant = activeMatch.board[r][c];
       if (!occupant) continue;
-      if (targetType === 'enemy' && occupant.owner !== piece.owner) targets.push({ row: r, col: c });
-      if (targetType === 'friendly' && occupant.owner === piece.owner) targets.push({ row: r, col: c });
-      if (targetType === 'any') targets.push({ row: r, col: c });
+      const qualifies =
+        (targetType === 'enemy' && occupant.owner !== piece.owner) ||
+        (targetType === 'friendly' && occupant.owner === piece.owner) ||
+        targetType === 'any';
+      if (qualifies && !targetSeen.has(anchorKey)) {
+        targets.push(anchor);
+        targetSeen.add(anchorKey);
+      }
     }
   }
   return { range, targets };
@@ -916,8 +1059,10 @@ boardEl.addEventListener('click', (event) => {
   const viewRow = Number(cellEl.dataset.row);
   const viewCol = Number(cellEl.dataset.col);
   const { row, col } = boardCoordsFromView(viewRow, viewCol);
-  const key = coordKey(row, col);
+  const anchor = anchorCoords({ row, col });
+  const key = coordKey(anchor.row, anchor.col);
   const cell = activeMatch.board[row][col];
+  const outpost = isOutpostAnchor(row, col) ? outpostAt(row, col) : null;
 
   if (currentMode === 'place' && selectedHandSlug) {
     if (!isHomeCell(row, col)) {
@@ -928,12 +1073,39 @@ boardEl.addEventListener('click', (event) => {
   }
 
   if (currentMode === 'move' && highlights.moves.has(key)) {
-    moveCard(row, col);
+    if (outpost) {
+      const destination = resolveOutpostDestination(outpost, selectedUnit);
+      if (destination) moveCard(destination.row, destination.col);
+      else metaEl.textContent = 'Outpost has no available space.';
+    } else {
+      moveCard(row, col);
+    }
     return;
   }
 
   if (currentMode === 'ability' && highlights.targets.has(key)) {
-    attackTarget(row, col, currentAbilitySlug);
+    if (outpost) {
+      const validTargets = (outpost.occupants || []).filter((occ) => {
+        const occAnchor = anchorCoords({ row: occ.row, col: occ.col });
+        return coordKey(occAnchor.row, occAnchor.col) === key;
+      });
+      const target = chooseOutpostOccupant({ ...outpost, occupants: validTargets });
+      if (target) attackTarget(target.row, target.col, currentAbilitySlug);
+    } else {
+      attackTarget(row, col, currentAbilitySlug);
+    }
+    return;
+  }
+
+  if (outpost) {
+    const anchorOccupants = (outpost.occupants || []).filter((occ) => {
+      const occAnchor = anchorCoords({ row: occ.row, col: occ.col });
+      return coordKey(occAnchor.row, occAnchor.col) === key;
+    });
+    const occupant =
+      chooseOutpostOccupant({ ...outpost, occupants: anchorOccupants }, currentSide) ||
+      chooseOutpostOccupant({ ...outpost, occupants: anchorOccupants });
+    if (occupant && occupant.owner === currentSide) selectUnit(occupant.row, occupant.col);
     return;
   }
 

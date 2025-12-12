@@ -323,6 +323,22 @@ function isHomeTerritory(match, player, position) {
   return position.row >= territory.rows.start && position.row <= territory.rows.end;
 }
 
+function homeTerritoryDepth(match, player, position) {
+  const assignments = territoryAssignments(match);
+  const territory = assignments[player];
+  if (!territory) return 0;
+
+  if (territory.side === 'north') {
+    return Math.max(0, territory.rows.end - position.row);
+  }
+
+  if (territory.side === 'south') {
+    return Math.max(0, position.row - territory.rows.start);
+  }
+
+  return 0;
+}
+
 function updatePieceTerritory(match, position, piece) {
   if (!piece) return;
   piece.enemyTerritory = !isHomeTerritory(match, piece.owner, position);
@@ -1455,6 +1471,68 @@ function choosePlacementCell(match, target, aggression = 1, owner = null) {
   return sorted[Math.floor(Math.random() * bucket)] || sorted[0];
 }
 
+function homeAnchor(match, player) {
+  const assignments = territoryAssignments(match);
+  const territory = assignments[player];
+  if (!territory) return null;
+
+  const col = Math.floor((gameConfig.board.cols - 1) / 2);
+  const row = territory.side === 'north' ? territory.rows.end : territory.rows.start;
+  return { row, col };
+}
+
+function shouldPlayDefensively(match, owner, targetEnemy, enemyPieces) {
+  const opponent = opponentOf(match, owner);
+  const ownCount = match.boardPieces?.[owner] ?? listPieces(match, owner).length;
+  const opponentCount = match.boardPieces?.[opponent] ?? listPieces(match, opponent).length;
+  const outnumbered = opponentCount > ownCount;
+
+  const anchor = homeAnchor(match, owner);
+  const closestToAnchor = anchor
+    ? enemyPieces.reduce((min, pos) => Math.min(min, manhattanDistance(anchor, pos)), Infinity)
+    : Infinity;
+
+  const threatenedAnchor = closestToAnchor <= 2;
+  const enemyTooClose = targetEnemy?.distance !== undefined ? targetEnemy.distance <= 2 : false;
+
+  return outnumbered || threatenedAnchor || enemyTooClose;
+}
+
+function chooseNpcPlacementCell(match, owner, aggression = 1, targetEnemy = null) {
+  const empties = findEmptyCells(match, owner);
+  if (!empties.length) return null;
+
+  const opponent = opponentOf(match, owner);
+  const enemyPieces = listPieces(match, opponent);
+  const defensive = shouldPlayDefensively(match, owner, targetEnemy, enemyPieces);
+
+  const scored = empties
+    .map((cell) => {
+      const distanceToTarget = targetEnemy ? manhattanDistance(cell, targetEnemy) : 0;
+      const distanceToNearestEnemy = enemyPieces.length
+        ? enemyPieces.reduce((min, pos) => Math.min(min, manhattanDistance(cell, pos)), Infinity)
+        : gameConfig.board.rows + gameConfig.board.cols;
+      const depth = homeTerritoryDepth(match, owner, cell);
+
+      const safetyWeight = defensive ? 2 : 1;
+      const safetyScore = distanceToNearestEnemy * safetyWeight + depth;
+      const offensePenalty = distanceToTarget * Math.max(1, aggression);
+
+      return {
+        cell,
+        total: safetyScore - offensePenalty,
+        safetyScore,
+        offensePenalty,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  if (!scored.length) return null;
+
+  const bucketSize = Math.max(1, Math.floor(scored.length * (defensive ? 0.25 : 0.15)));
+  return scored[Math.floor(Math.random() * bucketSize)]?.cell || scored[0].cell;
+}
+
 async function placeStartingUnitsFor(match, player, goal = STARTING_HAND_DRAW, aggressionOverride = null) {
   const hand = match.hands[player] || [];
   const deployments = match.deployments || {};
@@ -1492,7 +1570,7 @@ async function npcPlaceCard(match, aggressionOverride = null) {
   const targetEnemy = findNearestEnemy(match, npcName, { row: 0, col: 0 });
   const memory = aggressionOverride == null ? await loadNpcMemory() : null;
   const aggression = aggressionOverride ?? computeAggression(memory);
-  const cell = choosePlacementCell(match, targetEnemy, aggression, npcName);
+  const cell = chooseNpcPlacementCell(match, npcName, aggression, targetEnemy);
   if (!cell) return false;
 
   const unit = await buildUnit(card, npcName);

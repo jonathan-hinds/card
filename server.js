@@ -297,15 +297,22 @@ function createOutposts(board = gameConfig.board) {
   const midBottom = midTop + 1;
   const build = (id, startCol) => {
     const cells = [];
+    const origin = { row: midTop, col: startCol };
     for (let r = midTop; r <= midBottom; r += 1) {
       for (let c = startCol; c < startCol + 2; c += 1) {
-        cells.push({ row: r, col: c });
+        cells.push({
+          row: r,
+          col: c,
+          offsetRow: r - origin.row,
+          offsetCol: c - origin.col,
+        });
       }
     }
     return {
       id,
       name: id === 'west' ? 'Western Outpost' : 'Eastern Outpost',
       cells,
+      origin,
       capacity: OUTPOST_CAPACITY,
     };
   };
@@ -626,6 +633,7 @@ function summarizeMatch(match, viewer) {
     id: entry.id,
     name: entry.name,
     cells: entry.cells,
+    origin: entry.origin,
     ring: entry.ring,
     capacity: entry.capacity,
     owner: entry.owner,
@@ -2259,8 +2267,13 @@ app.post('/api/matches/:id/move', requireAuth, (req, res) => {
     match.board[toRow][toCol] = piece;
     match.board[fromRow][fromCol] = null;
     piece.stamina -= moveCost;
+    const targetSlot = targetOutpost?.cells?.find((cell) => cell.row === toRow && cell.col === toCol);
     piece.inOutpost = targetOutpost
-      ? { outpostId: targetOutpost.id, entryFrom: origin }
+      ? {
+          outpostId: targetOutpost.id,
+          entryFrom: origin,
+          position: targetSlot ? { rowOffset: targetSlot.offsetRow, colOffset: targetSlot.offsetCol } : null,
+        }
       : null;
     updatePieceTerritory(match, { row: toRow, col: toCol }, piece);
     refreshPieceTerritories(match);

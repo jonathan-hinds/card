@@ -293,13 +293,13 @@ function coordKey(position) {
 }
 
 function createOutposts(board = gameConfig.board) {
-  const midTop = Math.floor(board.rows / 2) - 1;
-  const midBottom = midTop + 1;
+  const originRow = Math.max(0, Math.floor(board.rows / 2) - 2);
   const build = (id, startCol) => {
+    const clampedStartCol = Math.max(0, Math.min(startCol, board.cols - 2));
     const cells = [];
-    const origin = { row: midTop, col: startCol };
-    for (let r = midTop; r <= midBottom; r += 1) {
-      for (let c = startCol; c < startCol + 2; c += 1) {
+    const origin = { row: originRow, col: clampedStartCol };
+    for (let r = originRow; r < Math.min(board.rows, originRow + 2); r += 1) {
+      for (let c = clampedStartCol; c < Math.min(board.cols, clampedStartCol + 2); c += 1) {
         cells.push({
           row: r,
           col: c,
@@ -317,8 +317,8 @@ function createOutposts(board = gameConfig.board) {
     };
   };
 
-  const leftStart = Math.max(1, Math.floor(board.cols * 0.1));
-  const rightStart = Math.max(board.cols - 3, leftStart + 2);
+  const leftStart = Math.max(0, Math.floor(board.cols * 0.1) - 1);
+  const rightStart = Math.min(board.cols - 2, Math.max(board.cols - 4, leftStart + 2));
   return [build('west', leftStart), build('east', rightStart)];
 }
 

@@ -293,7 +293,7 @@ function coordKey(position) {
 }
 
 function createOutposts(board = gameConfig.board) {
-  const originRow = Math.max(0, Math.floor(board.rows / 2) - 2);
+  const originRow = Math.max(0, Math.min(Math.floor(board.rows / 2) - 1, board.rows - 2));
   const build = (id, startCol) => {
     const clampedStartCol = Math.max(0, Math.min(startCol, board.cols - 2));
     const cells = [];

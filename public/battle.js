@@ -7,6 +7,7 @@ import {
 } from './common.js';
 
 const boardEl = document.getElementById('board');
+const outpostOverlayLayer = document.getElementById('outpost-overlays');
 const logEl = document.getElementById('log');
 const turnIndicator = document.getElementById('turn-indicator');
 const endTurnBtn = document.getElementById('end-turn');
@@ -200,6 +201,39 @@ function clearSelection(message = 'Action cancelled.') {
   if (message) metaEl.textContent = message;
 }
 
+function renderOutpostOutlines() {
+  if (!outpostOverlayLayer || !boardEl) return;
+  outpostOverlayLayer.innerHTML = '';
+  const currentOutposts = outposts();
+  if (!currentOutposts.length) return;
+
+  const layerRect = outpostOverlayLayer.getBoundingClientRect();
+  const padding = 4;
+
+  currentOutposts.forEach((outpost) => {
+    const viewCells = outpost.cells.map(({ row, col }) => boardCoordsToView(row, col));
+    const rects = viewCells
+      .map(({ row, col }) =>
+        boardEl.querySelector(`.board-cell[data-row="${row}"][data-col="${col}"]`)?.getBoundingClientRect()
+      )
+      .filter(Boolean);
+    if (!rects.length) return;
+
+    const minLeft = Math.min(...rects.map((rect) => rect.left));
+    const minTop = Math.min(...rects.map((rect) => rect.top));
+    const maxRight = Math.max(...rects.map((rect) => rect.right));
+    const maxBottom = Math.max(...rects.map((rect) => rect.bottom));
+
+    const outline = document.createElement('div');
+    outline.className = 'outpost-outline';
+    outline.style.left = `${Math.max(0, minLeft - layerRect.left - padding)}px`;
+    outline.style.top = `${Math.max(0, minTop - layerRect.top - padding)}px`;
+    outline.style.width = `${maxRight - minLeft + padding * 2}px`;
+    outline.style.height = `${maxBottom - minTop + padding * 2}px`;
+    outpostOverlayLayer.appendChild(outline);
+  });
+}
+
 function renderBoard(board) {
   const { rows, cols } = boardSize();
   boardEl.classList.toggle('board--flipped', Boolean(perspective().flipped));
@@ -328,6 +362,8 @@ function renderBoard(board) {
       boardEl.appendChild(cellEl);
     }
   }
+
+  requestAnimationFrame(renderOutpostOutlines);
 }
 
 function renderHand(hand) {
